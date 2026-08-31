@@ -1,0 +1,776 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Core platform: organizations, departments, users, roles/permissions.
+// Every future module (Document Control, Maintenance, HSE, Project Control,
+// Inventory, Accounting, HR) should reference Department, User, Project,
+// and/or Asset rather than duplicating access-control concepts.
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  departments      Department[]
+  projects         Project[]
+  assets           Asset[]
+  documents        Document[]
+  workOrders       WorkOrder[]
+  warehouses       Warehouse[]
+  inventoryItems   InventoryItem[]
+  vendors          Vendor[]
+  invoices         Invoice[]
+  incidents        Incident[]
+  employees        Employee[]
+  appraisalCycles  AppraisalCycle[]
+  appraisals       Appraisal[]
+
+  @@map("organizations")
+}
+
+model Department {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  code           String // short code, e.g. "MAINT", "HSE", "FIN"
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  users        User[]
+  documents    Document[]
+
+  @@unique([organizationId, code])
+  @@map("departments")
+}
+
+// One row per Cognito-authenticated identity. `cognitoSub` is the stable
+// unique identifier from the Cognito JWT `sub` claim — never the email,
+// which a user could in principle change.
+model User {
+  id           String   @id @default(uuid())
+  cognitoSub   String   @unique
+  email        String   @unique
+  firstName    String
+  lastName     String
+  departmentId String?
+  roleId       String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  department Department? @relation(fields: [departmentId], references: [id])
+  role       Role?       @relation(fields: [roleId], references: [id])
+  auditLogs  AuditLog[]
+
+  documentsOwned    Document[]         @relation("DocumentOwner")
+  documentVersions  DocumentVersion[]  @relation("DocumentVersionUploader")
+  documentApprovals DocumentApproval[] @relation("DocumentApprovalReviewer")
+
+  workOrdersRequested WorkOrder[] @relation("WorkOrderRequestedBy")
+  workOrdersAssigned  WorkOrder[] @relation("WorkOrderAssignedTo")
+
+  stockTransactions StockTransaction[]
+  paymentsRecorded  Payment[]
+
+  incidentsReported       Incident[]        @relation("IncidentReportedBy")
+  correctiveActionsOwned  CorrectiveAction[] @relation("CorrectiveActionAssignee")
+
+  // One HR record per employed user. Optional because not every
+  // Cognito-authenticated User is necessarily an onboarded employee
+  // (e.g. an external account created before HR processes them).
+  employee Employee?
+
+  @@map("users")
+}
+
+// Roles map 1:1 onto Cognito groups (see infra/cognito.tf
+// `department_seed_roles`). Keep the seed data in sync with that list.
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique // e.g. "admin", "maintenance", "hse"
+  description String?
+  createdAt   DateTime @default(now())
+
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String @id @default(uuid())
+  key         String @unique // e.g. "maintenance:work_order:create"
+  description String?
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// A Project is the anchor that Project Control, HSE incidents, Maintenance
+// work orders, and Accounting invoices can all be tied back to.
+model Project {
+  id             String        @id @default(uuid())
+  organizationId String
+  code           String
+  name           String
+  status         ProjectStatus @default(PLANNED)
+  startDate      DateTime?
+  endDate        DateTime?
+  budget         Decimal?      @db.Decimal(18, 2)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  assets       Asset[]
+  milestones   ProjectMilestone[]
+  documents    Document[]
+  invoices     Invoice[]
+  incidents    Incident[]
+
+  @@unique([organizationId, code])
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  PLANNED
+  ACTIVE
+  ON_HOLD
+  CLOSED
+}
+
+// A dated checkpoint within a project (permit approval, phase handover,
+// site mobilization, etc). Kept minimal — full task/schedule tracking is
+// out of scope for this foundation layer.
+model ProjectMilestone {
+  id          String          @id @default(uuid())
+  projectId   String
+  name        String
+  description String?
+  dueDate     DateTime
+  status      MilestoneStatus @default(PENDING)
+  completedAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@map("project_milestones")
+}
+
+enum MilestoneStatus {
+  PENDING
+  COMPLETED
+  DELAYED
+}
+
+// An Asset is the anchor for the Maintenance (CMMS) module — equipment,
+// vehicles, facilities — and can optionally be tied to the project it's
+// currently deployed on.
+model Asset {
+  id             String      @id @default(uuid())
+  organizationId String
+  projectId      String?
+  assetTag       String
+  name           String
+  category       String
+  status         AssetStatus @default(ACTIVE)
+  location       String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  project      Project?     @relation(fields: [projectId], references: [id])
+  workOrders   WorkOrder[]
+  incidents    Incident[]
+
+  @@unique([organizationId, assetTag])
+  @@map("assets")
+}
+
+enum AssetStatus {
+  ACTIVE
+  UNDER_MAINTENANCE
+  DECOMMISSIONED
+}
+
+// Generic audit trail. Every module should write here on create/update/delete
+// of significant records rather than inventing its own logging table.
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String // e.g. "CREATE", "UPDATE", "DELETE"
+  entityType String // e.g. "Project", "Asset", "Invoice"
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Document Control: versioned documents with a draft -> review -> approval
+// workflow. This is the backbone other modules (Maintenance, HSE, Project
+// Control) attach files and approvals to, so it's built to be reusable
+// rather than document-control-specific: the file storage convention
+// (Document -> DocumentVersion -> S3 key) is meant to be copied by any
+// module that needs versioned attachments.
+// ---------------------------------------------------------------------------
+
+model Document {
+  id             String         @id @default(uuid())
+  organizationId String
+  departmentId   String?
+  // Optional links so a project's contracts/permits/drawings, or a work
+  // order's photos/reports, can be listed via GET /documents?projectId=...
+  // or ?workOrderId=... without a separate join table.
+  projectId      String?
+  workOrderId    String?
+  invoiceId      String?
+  incidentId     String?
+  // Set when an employee self-submits a personal HR document (ID, cert,
+  // signed contract, etc) via POST /employees/me/documents.
+  employeeId     String?
+  title          String
+  description    String?
+  category       String?
+  status         DocumentStatus @default(DRAFT)
+  // Denormalized pointer to the latest DocumentVersion.versionNumber, so
+  // reads don't need to aggregate the versions table just to know "current".
+  currentVersion Int            @default(1)
+  ownerId        String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  department   Department?       @relation(fields: [departmentId], references: [id])
+  project      Project?          @relation(fields: [projectId], references: [id])
+  workOrder    WorkOrder?        @relation(fields: [workOrderId], references: [id])
+  invoice      Invoice?          @relation(fields: [invoiceId], references: [id])
+  incident     Incident?         @relation(fields: [incidentId], references: [id])
+  employee     Employee?         @relation(fields: [employeeId], references: [id])
+  owner        User              @relation("DocumentOwner", fields: [ownerId], references: [id])
+  versions     DocumentVersion[]
+
+  @@index([organizationId, status])
+  @@map("documents")
+}
+
+enum DocumentStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+// One row per uploaded file. Revision history lives here rather than being
+// reconstructed from audit logs, since a version's file must stay
+// retrievable even after later versions and decisions are recorded.
+model DocumentVersion {
+  id            String   @id @default(uuid())
+  documentId    String
+  versionNumber Int
+  // S3 object key, e.g. "documents/{orgId}/{documentId}/v{n}/{fileName}".
+  fileKey       String
+  fileName      String
+  mimeType      String
+  fileSizeBytes Int
+  uploadedById  String
+  createdAt     DateTime @default(now())
+
+  document   Document           @relation(fields: [documentId], references: [id])
+  uploadedBy User               @relation("DocumentVersionUploader", fields: [uploadedById], references: [id])
+  approvals  DocumentApproval[]
+
+  @@unique([documentId, versionNumber])
+  @@map("document_versions")
+}
+
+// A reviewer's decision on a specific version. A version can have several
+// (multi-reviewer sign-off); the document only moves to APPROVED once every
+// approval row for its current version is APPROVED.
+model DocumentApproval {
+  id                String         @id @default(uuid())
+  documentVersionId String
+  reviewerId        String
+  status            ApprovalStatus @default(PENDING)
+  comment           String?
+  decidedAt         DateTime?
+  createdAt         DateTime       @default(now())
+
+  documentVersion DocumentVersion @relation(fields: [documentVersionId], references: [id])
+  reviewer        User            @relation("DocumentApprovalReviewer", fields: [reviewerId], references: [id])
+
+  @@unique([documentVersionId, reviewerId])
+  @@map("document_approvals")
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ---------------------------------------------------------------------------
+// Maintenance (CMMS): work orders against an Asset. Opening/progressing a
+// work order keeps the Asset's own status in sync (see WorkOrdersService)
+// rather than requiring a separate manual step to mark equipment down.
+// ---------------------------------------------------------------------------
+
+model WorkOrder {
+  id             String            @id @default(uuid())
+  organizationId String
+  assetId        String
+  title          String
+  description    String?
+  type           WorkOrderType     @default(CORRECTIVE)
+  priority       WorkOrderPriority @default(MEDIUM)
+  status         WorkOrderStatus   @default(OPEN)
+  requestedById  String
+  assignedToId   String?
+  dueDate        DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  asset        Asset        @relation(fields: [assetId], references: [id])
+  requestedBy  User         @relation("WorkOrderRequestedBy", fields: [requestedById], references: [id])
+  assignedTo   User?        @relation("WorkOrderAssignedTo", fields: [assignedToId], references: [id])
+  documents    Document[]
+  stockTransactions StockTransaction[]
+
+  @@index([organizationId, status])
+  @@index([assetId, status])
+  @@map("work_orders")
+}
+
+enum WorkOrderType {
+  CORRECTIVE
+  PREVENTIVE
+}
+
+enum WorkOrderPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum WorkOrderStatus {
+  OPEN
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+// ---------------------------------------------------------------------------
+// Inventory: spare parts/consumables tracked per warehouse. StockLevel is a
+// denormalized running balance kept in sync by InventoryService inside the
+// same transaction as each StockTransaction — never write StockLevel.quantity
+// directly, always go through recordTransaction() so the two can't drift.
+// ---------------------------------------------------------------------------
+
+model Warehouse {
+  id             String   @id @default(uuid())
+  organizationId String
+  code           String
+  name           String
+  location       String?
+  createdAt      DateTime @default(now())
+
+  organization Organization       @relation(fields: [organizationId], references: [id])
+  stockLevels  StockLevel[]
+  transactions StockTransaction[]
+
+  @@unique([organizationId, code])
+  @@map("warehouses")
+}
+
+model InventoryItem {
+  id              String   @id @default(uuid())
+  organizationId  String
+  sku             String
+  name            String
+  description     String?
+  unitOfMeasure   String // e.g. "EA", "L", "KG"
+  reorderPoint    Int?
+  reorderQuantity Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id])
+  stockLevels  StockLevel[]
+  transactions StockTransaction[]
+
+  @@unique([organizationId, sku])
+  @@map("inventory_items")
+}
+
+// Running balance for one item in one warehouse. Absence of a row means
+// zero stock — a row is only created the first time a transaction touches
+// that (item, warehouse) pair.
+model StockLevel {
+  id              String   @id @default(uuid())
+  itemId          String
+  warehouseId     String
+  quantityOnHand  Int      @default(0)
+  updatedAt       DateTime @updatedAt
+
+  item      InventoryItem @relation(fields: [itemId], references: [id])
+  warehouse Warehouse     @relation(fields: [warehouseId], references: [id])
+
+  @@unique([itemId, warehouseId])
+  @@map("stock_levels")
+}
+
+// One immutable row per stock movement — the audit trail StockLevel's
+// running balance is derived from. RECEIPT/ADJUSTMENT(+) increase it,
+// ISSUE/TRANSFER/ADJUSTMENT(-) decrease it; TRANSFER additionally writes a
+// second row (the receiving warehouse's own ledger) via
+// InventoryService.transfer().
+model StockTransaction {
+  id          String               @id @default(uuid())
+  itemId      String
+  warehouseId String
+  type        StockTransactionType
+  // Signed: positive for stock moving in, negative for stock moving out.
+  quantity    Int
+  notes       String?
+  workOrderId String?
+  performedById String
+  createdAt   DateTime             @default(now())
+
+  item        InventoryItem @relation(fields: [itemId], references: [id])
+  warehouse   Warehouse     @relation(fields: [warehouseId], references: [id])
+  workOrder   WorkOrder?    @relation(fields: [workOrderId], references: [id])
+  performedBy User          @relation(fields: [performedById], references: [id])
+
+  @@index([itemId, warehouseId])
+  @@map("stock_transactions")
+}
+
+enum StockTransactionType {
+  RECEIPT
+  ISSUE
+  ADJUSTMENT
+  TRANSFER
+}
+
+// ---------------------------------------------------------------------------
+// Accounting: vendor invoices (payable) and customer invoices (receivable),
+// with a guarded approve -> pay workflow. An invoice can only be paid once
+// APPROVED, and only moves to PAID once its Payments sum to the full total —
+// see InvoicesService.recordPayment(), the same "children drive the parent's
+// state" pattern Document Control uses for approvals.
+// ---------------------------------------------------------------------------
+
+model Vendor {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  contactEmail   String?
+  contactPhone   String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  invoices     Invoice[]
+
+  @@unique([organizationId, name])
+  @@map("vendors")
+}
+
+model Invoice {
+  id             String        @id @default(uuid())
+  organizationId String
+  projectId      String?
+  type           InvoiceType
+  // Required for PAYABLE, unused for RECEIVABLE.
+  vendorId       String?
+  // Required for RECEIVABLE; no Customer model exists yet in this
+  // foundation layer, so this stays a plain string rather than a half-built
+  // CRM entity.
+  customerName   String?
+  invoiceNumber  String
+  issueDate      DateTime      @default(now())
+  dueDate        DateTime?
+  subtotal       Decimal       @db.Decimal(18, 2)
+  tax            Decimal       @default(0) @db.Decimal(18, 2)
+  // total = subtotal + tax, computed server-side — never trust a
+  // client-supplied total.
+  total          Decimal       @db.Decimal(18, 2)
+  status         InvoiceStatus @default(DRAFT)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  project      Project?     @relation(fields: [projectId], references: [id])
+  vendor       Vendor?      @relation(fields: [vendorId], references: [id])
+  payments     Payment[]
+  documents    Document[]
+
+  @@unique([organizationId, invoiceNumber])
+  @@map("invoices")
+}
+
+enum InvoiceType {
+  PAYABLE
+  RECEIVABLE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  APPROVED
+  PAID
+  VOID
+}
+
+// One immutable row per payment applied to an invoice. An invoice's
+// remaining balance is total minus the sum of its Payments — derived, never
+// stored, so it can't drift from the ledger.
+model Payment {
+  id            String   @id @default(uuid())
+  invoiceId     String
+  amount        Decimal  @db.Decimal(18, 2)
+  method        String?
+  reference     String?
+  recordedById  String
+  createdAt     DateTime @default(now())
+
+  invoice    Invoice @relation(fields: [invoiceId], references: [id])
+  recordedBy User    @relation(fields: [recordedById], references: [id])
+
+  @@map("payments")
+}
+
+// ---------------------------------------------------------------------------
+// HSE: incident reporting with an investigation workflow. Reporting is open
+// to any authenticated user — safety reporting should never be gated behind
+// a role — but progressing an incident and closing it out is restricted.
+// An incident can only reach CLOSED once every CorrectiveAction on it is
+// COMPLETED, the same "children drive the parent's state" rule Document
+// Control uses for approvals and Accounting uses for payments.
+// ---------------------------------------------------------------------------
+
+model Incident {
+  id             String         @id @default(uuid())
+  organizationId String
+  projectId      String?
+  assetId        String?
+  title          String
+  description    String?
+  type           IncidentType
+  severity       IncidentSeverity
+  status         IncidentStatus @default(REPORTED)
+  occurredAt     DateTime
+  location       String?
+  reportedById   String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization      Organization       @relation(fields: [organizationId], references: [id])
+  project           Project?           @relation(fields: [projectId], references: [id])
+  asset             Asset?             @relation(fields: [assetId], references: [id])
+  reportedBy        User               @relation("IncidentReportedBy", fields: [reportedById], references: [id])
+  correctiveActions CorrectiveAction[]
+  documents         Document[]
+
+  @@index([organizationId, status])
+  @@map("incidents")
+}
+
+enum IncidentType {
+  INJURY
+  NEAR_MISS
+  ENVIRONMENTAL
+  PROPERTY_DAMAGE
+  SECURITY
+}
+
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentStatus {
+  REPORTED
+  UNDER_INVESTIGATION
+  CORRECTIVE_ACTION
+  CLOSED
+}
+
+// A remediation task raised against an incident's investigation. Mirrors
+// ProjectMilestone's shape (assignee + due date + status + completedAt).
+model CorrectiveAction {
+  id           String                 @id @default(uuid())
+  incidentId   String
+  description  String
+  assignedToId String
+  dueDate      DateTime
+  status       CorrectiveActionStatus @default(PENDING)
+  completedAt  DateTime?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  incident   Incident @relation(fields: [incidentId], references: [id])
+  assignedTo User     @relation("CorrectiveActionAssignee", fields: [assignedToId], references: [id])
+
+  @@map("corrective_actions")
+}
+
+enum CorrectiveActionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+// ---------------------------------------------------------------------------
+// HR: employee records, self-service document submission (via Document's
+// optional employeeId, above), and 360-degree appraisals. An Appraisal
+// gathers feedback from several AppraisalReviewer rows (self, manager,
+// peers, subordinates) and only reaches COMPLETED once every one of them
+// has SUBMITTED — the same "children drive the parent's state" rule used
+// throughout this codebase (Document Control approvals, Accounting
+// payments, HSE corrective actions).
+// ---------------------------------------------------------------------------
+
+model Employee {
+  id               String           @id @default(uuid())
+  organizationId   String
+  userId           String           @unique
+  employeeNumber   String
+  jobTitle         String
+  hireDate         DateTime
+  employmentStatus EmploymentStatus @default(ACTIVE)
+  managerId        String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+  manager      Employee?    @relation("EmployeeManager", fields: [managerId], references: [id])
+  directReports Employee[]  @relation("EmployeeManager")
+
+  documents          Document[]
+  appraisalsAsSubject Appraisal[]        @relation("AppraisalSubject")
+  appraisalReviews    AppraisalReviewer[] @relation("AppraisalReviewerEmployee")
+
+  @@unique([organizationId, employeeNumber])
+  @@map("employees")
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+model AppraisalCycle {
+  id             String               @id @default(uuid())
+  organizationId String
+  name           String
+  startDate      DateTime
+  endDate        DateTime
+  status         AppraisalCycleStatus @default(DRAFT)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  appraisals   Appraisal[]
+
+  @@map("appraisal_cycles")
+}
+
+enum AppraisalCycleStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+// One 360-degree review of one employee within one cycle.
+model Appraisal {
+  id             String          @id @default(uuid())
+  organizationId String
+  cycleId        String
+  employeeId     String
+  status         AppraisalStatus @default(PENDING)
+  // Average of all AppraisalReviewer.rating once every reviewer has
+  // submitted — null until then.
+  overallRating  Decimal?        @db.Decimal(3, 2)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  cycle        AppraisalCycle      @relation(fields: [cycleId], references: [id])
+  employee     Employee            @relation("AppraisalSubject", fields: [employeeId], references: [id])
+  reviewers    AppraisalReviewer[]
+
+  @@unique([cycleId, employeeId])
+  @@map("appraisals")
+}
+
+enum AppraisalStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+// One rater's feedback within a 360 appraisal. relationType records the
+// rater's relationship to the subject so feedback can be read/aggregated
+// per perspective (self vs. manager vs. peers vs. subordinates).
+model AppraisalReviewer {
+  id           String                    @id @default(uuid())
+  appraisalId  String
+  reviewerId   String
+  relationType AppraisalRelationType
+  status       AppraisalReviewStatus     @default(PENDING)
+  rating       Int?
+  comments     String?
+  submittedAt  DateTime?
+  createdAt    DateTime                  @default(now())
+
+  appraisal Appraisal @relation(fields: [appraisalId], references: [id])
+  reviewer  Employee  @relation("AppraisalReviewerEmployee", fields: [reviewerId], references: [id])
+
+  @@unique([appraisalId, reviewerId])
+  @@map("appraisal_reviewers")
+}
+
+enum AppraisalRelationType {
+  SELF
+  MANAGER
+  PEER
+  SUBORDINATE
+}
+
+enum AppraisalReviewStatus {
+  PENDING
+  SUBMITTED
+}
