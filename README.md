@@ -499,7 +499,31 @@ shape — `src/api/<module>.ts` for typed request functions, a
 `<Module>DetailPage.tsx` using `useQuery`/`useMutation`, gate
 mutation-triggering buttons on `useRole()` matching the backend's
 `@Roles(...)` on that route, then flip its `AppNav` entry over to a `path`
-and add the route in `App.tsx`.
+and add the route in `App.tsx`. Copy `OrganizationsListPage.test.tsx`'s
+shape for its tests too — see below.
+
+### Frontend tests (`npm test`)
+
+Vitest + `@testing-library/react`, run from `frontend/`:
+
+```bash
+cd frontend
+npm test          # run once (this is also what CI runs)
+npm run test:watch
+```
+
+`roleStore.test.ts`/`client.test.ts` unit-test the pure logic (localStorage
+persistence, request/error handling — `fetch` is mocked, no backend
+needed). `OrganizationsListPage.test.tsx` is the component-level template:
+renders against a mocked `api/organizations` module (not real HTTP) inside
+`renderWithProviders` (Mantine/react-query/router/RoleProvider wired up),
+and covers the same shape worth testing in every future module's page —
+data rendering, empty state, RBAC-gated buttons, a mutation's happy path,
+and client-side validation. `src/test/setup.ts` also carries two jsdom
+workarounds every new test file gets for free: a `matchMedia` stub Mantine
+needs, and a `localStorage` polyfill (Node 22+'s experimental native
+`localStorage` global can shadow jsdom's own working one and make every
+call throw — see the comment there for why this isn't just a CLI flag).
 
 ## Testing
 

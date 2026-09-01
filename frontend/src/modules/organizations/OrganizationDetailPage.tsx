@@ -134,7 +134,7 @@ export function OrganizationDetailPage() {
       </Table>
 
       <Modal opened={createOpen} onClose={() => setCreateOpen(false)} title="New department">
-        <form onSubmit={createForm.onSubmit((values) => createMutation.mutate(values))}>
+        <form noValidate onSubmit={createForm.onSubmit((values) => createMutation.mutate(values))}>
           <Stack>
             <TextInput label="Code" placeholder="FIN" required {...createForm.getInputProps('code')} />
             <TextInput label="Name" placeholder="Finance" required {...createForm.getInputProps('name')} />
@@ -148,7 +148,7 @@ export function OrganizationDetailPage() {
       </Modal>
 
       <Modal opened={!!editing} onClose={() => setEditing(null)} title="Rename department">
-        <form onSubmit={editForm.onSubmit((values) => updateMutation.mutate(values))}>
+        <form noValidate onSubmit={editForm.onSubmit((values) => updateMutation.mutate(values))}>
           <Stack>
             <TextInput label="Code" required {...editForm.getInputProps('code')} />
             <TextInput label="Name" required {...editForm.getInputProps('name')} />

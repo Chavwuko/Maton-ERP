@@ -89,7 +89,7 @@ export function OrganizationsListPage() {
       )}
 
       <Modal opened={createOpen} onClose={() => setCreateOpen(false)} title="New organization">
-        <form onSubmit={form.onSubmit((values) => createMutation.mutate(values))}>
+        <form noValidate onSubmit={form.onSubmit((values) => createMutation.mutate(values))}>
           <Stack>
             <TextInput label="Name" placeholder="Acme Industrial" required {...form.getInputProps('name')} />
             <Group justify="flex-end">
