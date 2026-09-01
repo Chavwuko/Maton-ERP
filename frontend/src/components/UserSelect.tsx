@@ -11,11 +11,16 @@ function userLabel(user: User) {
 }
 
 interface UserSelectProps extends Partial<SelectProps> {
-  role?: string | string[];
+  // Not named `role` — that collides with Mantine's (and the DOM's) ARIA
+  // `role` prop, which SelectProps already declares with a narrower type.
+  roleFilter?: string | string[];
 }
 
-export function UserSelect({ label = 'User', role, ...rest }: UserSelectProps) {
-  const { data } = useQuery({ queryKey: ['users', { role }], queryFn: () => listUsers({ role }) });
+export function UserSelect({ label = 'User', roleFilter, ...rest }: UserSelectProps) {
+  const { data } = useQuery({
+    queryKey: ['users', { role: roleFilter }],
+    queryFn: () => listUsers({ role: roleFilter }),
+  });
 
   return (
     <Select

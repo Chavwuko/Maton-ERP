@@ -191,7 +191,7 @@ export function DocumentDetailPage() {
           <Stack>
             <UserMultiSelect
               label="Reviewers"
-              role={REVIEWER_ROLES}
+              roleFilter={REVIEWER_ROLES}
               required
               {...submitForm.getInputProps('reviewerIds')}
             />

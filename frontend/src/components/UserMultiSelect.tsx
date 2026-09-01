@@ -9,11 +9,16 @@ function userLabel(user: User) {
 }
 
 interface UserMultiSelectProps extends Partial<MultiSelectProps> {
-  role?: string | string[];
+  // Not named `role` — that collides with Mantine's (and the DOM's) ARIA
+  // `role` prop, which MultiSelectProps already declares with a narrower type.
+  roleFilter?: string | string[];
 }
 
-export function UserMultiSelect({ label = 'Users', role, ...rest }: UserMultiSelectProps) {
-  const { data } = useQuery({ queryKey: ['users', { role }], queryFn: () => listUsers({ role }) });
+export function UserMultiSelect({ label = 'Users', roleFilter, ...rest }: UserMultiSelectProps) {
+  const { data } = useQuery({
+    queryKey: ['users', { role: roleFilter }],
+    queryFn: () => listUsers({ role: roleFilter }),
+  });
 
   return (
     <MultiSelect
