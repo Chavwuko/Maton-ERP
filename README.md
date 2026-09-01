@@ -40,18 +40,47 @@ erp-foundations/
 
 ## How authentication works
 
-1. Users authenticate against the Cognito Hosted UI (`cognito_hosted_ui_domain`
-   output) and receive a JWT access token.
-2. Every API request sends `Authorization: Bearer <token>`.
-3. `CognitoAuthGuard` (applied globally via `AuthModule`) verifies the token
-   against the Cognito public keys, then looks up or lazily creates the
-   matching row in the local `users` table.
-4. `RolesGuard` (also global) checks `@Roles('admin', 'maintenance')` on the
+Login is **backend-mediated**: the browser never sees Cognito's client
+secret or the tokens themselves, only this app's own session cookie.
+`infra/cognito.tf`'s single app client is confidential (`generate_secret =
+true`) for exactly this reason, and its OAuth callback URL already points at
+the backend rather than the frontend.
+
+1. The frontend sends the browser to `GET /auth/login`, which redirects to
+   the Cognito Hosted UI (`cognito_hosted_ui_domain` output).
+2. After the user signs in, Cognito redirects to `GET /auth/callback?code=`.
+   `AuthController` (via `CognitoOAuthService`) exchanges the code for tokens
+   using the client secret, then sets the access token as an httpOnly,
+   `secure`, `sameSite: lax` cookie (`erp_session`) and redirects to
+   `FRONTEND_URL`.
+3. Every subsequent API request from the browser carries that cookie
+   automatically (the frontend's `apiClient` sends `credentials: 'include'`,
+   and the backend's CORS config allows credentials from `FRONTEND_URL`).
+4. `CognitoAuthGuard` (applied globally via `AuthModule`) reads the token
+   from either the cookie or an `Authorization: Bearer` header (useful for
+   scripts/tooling), verifies it against Cognito's public keys, and looks up
+   or lazily creates the matching row in the local `users` table. It then
+   syncs that user's `Role` from the token's `cognito:groups` claim on every
+   request (preferring the `admin` group if the user is in more than one) —
+   Cognito group membership is the source of truth for role assignment, not
+   anything set locally.
+5. `RolesGuard` (also global) checks `@Roles('admin', 'maintenance')` on the
    route, if present, against the user's `Role.name`. Role names must match
    Cognito group names — see `department_seed_roles` in
    `infra/variables.tf` and `backend/prisma/seed.ts`.
-5. Routes that should skip auth entirely (currently only `/health`) are
-   marked `@Public()`.
+6. `GET /auth/logout` clears the cookie and redirects to the Cognito Hosted
+   UI's own logout endpoint, which ends the Cognito session too and then
+   redirects back to `FRONTEND_URL`.
+7. Routes that should skip auth entirely (`/health`, and all four
+   `/auth/*` routes above except `/auth/me`) are marked `@Public()`.
+
+**Local dev never touches any of this** — `AUTH_MODE=local` swaps in
+`LocalDevAuthGuard` instead (see below), and the frontend's matching
+`VITE_AUTH_MODE=local` (the default) keeps the `x-local-role` switcher
+instead of gating on a real session. Set both to `cognito` to exercise the
+real flow above; this requires an actually-applied `infra/` (`COGNITO_DOMAIN`,
+`COGNITO_CLIENT_SECRET`, etc. — see `backend/.env.example`), which this
+project doesn't have yet (see "Notes on scope").
 
 ## Data model
 
@@ -480,21 +509,32 @@ after the first build.
 ## Frontend
 
 React + TypeScript + Vite SPA in `frontend/`, talking to the backend over
-plain `fetch` (CORS is wide open via `app.enableCors()` in
-`backend/src/main.ts`, so no proxy is needed for local dev). Stack:
-`react-router-dom` for routing, `@tanstack/react-query` for server-state
-caching, and Mantine (`@mantine/core`/`form`/`notifications`) for UI.
+plain `fetch` with `credentials: 'include'` (CORS in `backend/src/main.ts`
+allows exactly `FRONTEND_URL` with credentials — needed so the `erp_session`
+cookie from the Cognito login flow round-trips; see "How authentication
+works"). Stack: `react-router-dom` for routing, `@tanstack/react-query` for
+server-state caching, and Mantine (`@mantine/core`/`form`/`notifications`)
+for UI.
 
 **Every module now has a UI** (Organizations/Departments, Document
 Control, Project Control, Assets, Maintenance, Inventory, Accounting,
 HSE, HR) — list/detail/create pages, RBAC-gated on `useRole()` to match
 each route's backend `@Roles(...)`, and a shared `StatusMenu` component
 (`src/components/StatusMenu.tsx`) that only ever offers the next statuses
-each module's `ALLOWED_TRANSITIONS` map actually permits. A few UI-only
-gaps, called out inline where they show up: several forms (work order
-assignment, corrective-action assignee, document reviewers, employee
-`userId`) take a raw user-id string rather than a picker, since there's
-no user-listing endpoint exposed to the frontend yet.
+each module's `ALLOWED_TRANSITIONS` map actually permits. Forms that need to
+assign a user (work order assignment, corrective-action assignee, document
+reviewers, employee `userId`) use the `UserSelect`/`UserMultiSelect` pickers
+(`src/components/`), backed by the read-only `GET /users` directory.
+
+**Auth**: `src/auth/authMode.ts` mirrors the backend's `AUTH_MODE` switch via
+`VITE_AUTH_MODE` (default `local`, matching `AUTH_MODE=local`). `local` keeps
+the `RoleSwitcher` in the header and needs nothing else. `cognito` swaps in
+`AuthGate` (`src/auth/AuthGate.tsx`), which gates the whole app behind `GET
+/auth/me`: a spinner while loading, a "Log in" button (→ `/auth/login`) when
+there's no session, and the app otherwise — with `RoleContext`'s role
+resolved read-only from the session instead of the switcher, and a
+`SessionBadge` (email + role + a "Log out" link → `/auth/logout`) replacing
+`RoleSwitcher` in the header.
 
 **Fixed**: Document Control's presigned download URLs used to be
 generated using the backend's `S3_ENDPOINT` (`http://minio:9000` in the
@@ -738,3 +778,13 @@ closes that gap with the standard CRUD shape used elsewhere: `GET
 `POST /departments` (admin-only, `P2002` on `(organizationId, code)` →
 409), and `PATCH /departments/:id` (admin-only, `P2002` → 409, `P2025` →
 404) for renaming.
+
+**Unverified against real infra**: the backend-mediated Cognito login flow
+(`AuthController`, `CognitoOAuthService`, `CognitoAuthGuard`'s cookie/group-
+sync additions — see "How authentication works") is built and covered by
+unit tests with a mocked verifier/`fetch`, plus e2e tests for everything
+that doesn't require a live Cognito User Pool (redirect shapes, `/auth/me`
+under `AUTH_MODE=local`). `infra/` has never actually been `terraform
+apply`'d (see "Local development against the real AWS infra" — no AWS
+account backs this project yet), so the real authorize → callback → token
+exchange round-trip against Cognito itself has not been exercised live.

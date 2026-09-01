@@ -1,6 +1,12 @@
 import { apiClient } from './client';
+import { getAuthMode } from '../auth/authMode';
 import { getCurrentRole } from '../auth/roleStore';
 import type { AppDocument, DocumentStatus } from '../modules/document-control/types';
+
+// AUTH_MODE=cognito carries identity in the erp_session cookie instead.
+function authHeaders(): Record<string, string> {
+  return getAuthMode() === 'local' ? { 'x-local-role': getCurrentRole() } : {};
+}
 
 export interface CreateDocumentFields {
   organizationId: string;
@@ -53,7 +59,8 @@ export async function createDocument(fields: CreateDocumentFields, file: File): 
 
   const res = await fetch(`${BASE_URL}/documents`, {
     method: 'POST',
-    headers: { 'x-local-role': getCurrentRole() },
+    headers: authHeaders(),
+    credentials: 'include',
     body: form,
   });
   if (!res.ok) {
@@ -70,7 +77,8 @@ export async function addDocumentVersion(documentId: string, file: File): Promis
 
   const res = await fetch(`${BASE_URL}/documents/${documentId}/versions`, {
     method: 'POST',
-    headers: { 'x-local-role': getCurrentRole() },
+    headers: authHeaders(),
+    credentials: 'include',
     body: form,
   });
   if (!res.ok) {

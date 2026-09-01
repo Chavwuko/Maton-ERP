@@ -139,4 +139,116 @@ describe('CognitoAuthGuard', () => {
       guard.canActivate(contextFor({ headers: { authorization: 'Bearer good-token' } })),
     ).rejects.toThrow('User account is deactivated');
   });
+
+  it('falls back to the erp_session cookie when there is no Authorization header', async () => {
+    reflector.getAllAndOverride.mockReturnValue(false);
+    verify.mockResolvedValue({ sub: 'sub-1' });
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      cognitoSub: 'sub-1',
+      email: 'a@b.com',
+      departmentId: null,
+      isActive: true,
+      role: null,
+    } as never);
+    const req = { headers: {}, cookies: { erp_session: 'cookie-token' } };
+
+    await expect(guard.canActivate(contextFor(req))).resolves.toBe(true);
+    expect(verify).toHaveBeenCalledWith('cookie-token');
+  });
+
+  it('rejects when neither a bearer header nor a session cookie is present', async () => {
+    reflector.getAllAndOverride.mockReturnValue(false);
+
+    await expect(guard.canActivate(contextFor({ headers: {}, cookies: {} }))).rejects.toThrow(
+      UnauthorizedException,
+    );
+  });
+
+  it('assigns a role the first time the token carries a matching Cognito group', async () => {
+    reflector.getAllAndOverride.mockReturnValue(false);
+    verify.mockResolvedValue({ sub: 'sub-1', 'cognito:groups': ['hse'] });
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      cognitoSub: 'sub-1',
+      email: 'a@b.com',
+      departmentId: null,
+      isActive: true,
+      roleId: null,
+      role: null,
+    } as never);
+    prisma.role.findUnique.mockResolvedValue({ id: 'role-hse', name: 'hse' } as never);
+
+    const req = { headers: { authorization: 'Bearer good-token' } };
+    await guard.canActivate(contextFor(req));
+
+    expect(prisma.role.findUnique).toHaveBeenCalledWith({ where: { name: 'hse' } });
+    expect(prisma.user.update).toHaveBeenCalledWith({ where: { id: 'user-1' }, data: { roleId: 'role-hse' } });
+    expect((req as { user?: { roleName: string | null } }).user?.roleName).toBe('hse');
+  });
+
+  it('prefers the admin group when the token lists multiple Cognito groups', async () => {
+    reflector.getAllAndOverride.mockReturnValue(false);
+    verify.mockResolvedValue({ sub: 'sub-1', 'cognito:groups': ['hse', 'admin'] });
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      isActive: true,
+      roleId: null,
+      role: null,
+    } as never);
+    prisma.role.findUnique.mockResolvedValue({ id: 'role-admin', name: 'admin' } as never);
+
+    await guard.canActivate(contextFor({ headers: { authorization: 'Bearer good-token' } }));
+
+    expect(prisma.role.findUnique).toHaveBeenCalledWith({ where: { name: 'admin' } });
+  });
+
+  it('does not touch the database when the group already matches the current role', async () => {
+    reflector.getAllAndOverride.mockReturnValue(false);
+    verify.mockResolvedValue({ sub: 'sub-1', 'cognito:groups': ['hse'] });
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      isActive: true,
+      roleId: 'role-hse',
+      role: { name: 'hse' },
+    } as never);
+    prisma.role.findUnique.mockResolvedValue({ id: 'role-hse', name: 'hse' } as never);
+
+    await guard.canActivate(contextFor({ headers: { authorization: 'Bearer good-token' } }));
+
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('leaves the role alone when no Cognito group matches a known Role', async () => {
+    reflector.getAllAndOverride.mockReturnValue(false);
+    verify.mockResolvedValue({ sub: 'sub-1', 'cognito:groups': ['not-a-real-role'] });
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      isActive: true,
+      roleId: null,
+      role: null,
+    } as never);
+    prisma.role.findUnique.mockResolvedValue(null);
+
+    const req = { headers: { authorization: 'Bearer good-token' } };
+    await guard.canActivate(contextFor(req));
+
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect((req as { user?: { roleName: string | null } }).user?.roleName).toBeNull();
+  });
+
+  it('does not touch role sync at all when the token carries no Cognito groups', async () => {
+    reflector.getAllAndOverride.mockReturnValue(false);
+    verify.mockResolvedValue({ sub: 'sub-1' });
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      isActive: true,
+      roleId: 'role-admin',
+      role: { name: 'admin' },
+    } as never);
+
+    await guard.canActivate(contextFor({ headers: { authorization: 'Bearer good-token' } }));
+
+    expect(prisma.role.findUnique).not.toHaveBeenCalled();
+  });
 });

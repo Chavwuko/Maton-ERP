@@ -88,6 +88,12 @@ variable "cognito_logout_urls" {
   default     = ["http://localhost:3000"]
 }
 
+variable "frontend_url" {
+  description = "Where the backend sends the browser after login/logout (AuthController)"
+  type        = string
+  default     = "http://localhost:5173"
+}
+
 variable "department_seed_roles" {
   description = "Initial Cognito groups representing top-level ERP roles"
   type        = list(string)

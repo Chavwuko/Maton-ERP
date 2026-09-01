@@ -70,6 +70,19 @@ resource "aws_cognito_user_pool_client" "backend" {
   }
 }
 
+# The backend needs this to exchange an auth code for tokens server-side
+# (see backend/src/auth/cognito-oauth.service.ts) — stored in Secrets
+# Manager rather than a plain ECS env var, mirroring db_credentials in
+# rds.tf, since unlike the client id this must stay confidential.
+resource "aws_secretsmanager_secret" "cognito_client_secret" {
+  name = "${local.name_prefix}/cognito-client-secret"
+}
+
+resource "aws_secretsmanager_secret_version" "cognito_client_secret" {
+  secret_id     = aws_secretsmanager_secret.cognito_client_secret.id
+  secret_string = aws_cognito_user_pool_client.backend.client_secret
+}
+
 # One Cognito group per top-level ERP role. The backend maps these group
 # names directly onto the Role records seeded in the application database
 # (see backend/prisma/seed.ts), so keep the two in sync.

@@ -52,13 +52,11 @@ export class CognitoAuthGuard implements CanActivate {
     }
 
     const req = context.switchToHttp().getRequest<Request>();
-    const authHeader = req.headers.authorization;
+    const token = this.extractToken(req);
 
-    if (!authHeader?.startsWith('Bearer ')) {
+    if (!token) {
       throw new UnauthorizedException('Missing bearer token');
     }
-
-    const token = authHeader.slice('Bearer '.length);
 
     let payload;
     try {
@@ -91,14 +89,52 @@ export class CognitoAuthGuard implements CanActivate {
       throw new UnauthorizedException('User account is deactivated');
     }
 
+    const role = await this.syncRoleFromCognitoGroups(user, payload);
+
     req.user = {
       id: user.id,
       cognitoSub: user.cognitoSub,
       email: user.email,
-      roleName: user.role?.name ?? null,
+      roleName: role?.name ?? user.role?.name ?? null,
       departmentId: user.departmentId,
     };
 
     return true;
+  }
+
+  // Bearer header takes precedence (useful for tooling/scripts); the
+  // backend-mediated login flow (see AuthController) otherwise leaves the
+  // access token in an httpOnly cookie, since a SPA can't safely hold it.
+  private extractToken(req: Request): string | undefined {
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      return authHeader.slice('Bearer '.length);
+    }
+    return (req as Request & { cookies?: Record<string, string> }).cookies?.erp_session;
+  }
+
+  // Cognito groups are the source of truth for role assignment — group
+  // membership is managed in the Cognito console/API, not this app. Every
+  // request re-syncs the local Role link in case group membership changed
+  // since the user's last login. A user in multiple groups gets 'admin' if
+  // present (matching RolesGuard's own "admin always passes" special case),
+  // otherwise whichever group comes first in the token.
+  private async syncRoleFromCognitoGroups(
+    user: { id: string; roleId: string | null },
+    payload: unknown,
+  ) {
+    const groups = (payload as Record<string, unknown>)['cognito:groups'] as string[] | undefined;
+    if (!groups?.length) {
+      return null;
+    }
+
+    const groupName = groups.includes('admin') ? 'admin' : groups[0];
+    const role = await this.prisma.role.findUnique({ where: { name: groupName } });
+    if (!role || role.id === user.roleId) {
+      return role;
+    }
+
+    await this.prisma.user.update({ where: { id: user.id }, data: { roleId: role.id } });
+    return role;
   }
 }

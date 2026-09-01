@@ -4,6 +4,11 @@ vi.mock('../auth/roleStore', () => ({
   getCurrentRole: () => 'admin',
 }));
 
+let authMode = 'local';
+vi.mock('../auth/authMode', () => ({
+  getAuthMode: () => authMode,
+}));
+
 function jsonResponse(body: unknown, init?: { status?: number }) {
   return new Response(JSON.stringify(body), {
     status: init?.status ?? 200,
@@ -13,6 +18,7 @@ function jsonResponse(body: unknown, init?: { status?: number }) {
 
 describe('apiClient', () => {
   beforeEach(() => {
+    authMode = 'local';
     vi.stubGlobal('fetch', vi.fn());
   });
 
@@ -31,6 +37,27 @@ describe('apiClient', () => {
     const [url, init] = vi.mocked(fetch).mock.calls[0];
     expect(url).toBe('http://localhost:3000/organizations/org-1');
     expect((init?.headers as Record<string, string>)['x-local-role']).toBe('admin');
+  });
+
+  it('always sends credentials: include, so a cognito-mode session cookie round-trips', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({ id: 'org-1' }));
+    const { apiClient } = await import('./client');
+
+    await apiClient.get('/organizations/org-1');
+
+    const [, init] = vi.mocked(fetch).mock.calls[0];
+    expect(init?.credentials).toBe('include');
+  });
+
+  it('omits the x-local-role header in AUTH_MODE=cognito', async () => {
+    authMode = 'cognito';
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({ id: 'org-1' }));
+    const { apiClient } = await import('./client');
+
+    await apiClient.get('/organizations/org-1');
+
+    const [, init] = vi.mocked(fetch).mock.calls[0];
+    expect((init?.headers as Record<string, string>)['x-local-role']).toBeUndefined();
   });
 
   it('POST sends the method and JSON-stringified body', async () => {

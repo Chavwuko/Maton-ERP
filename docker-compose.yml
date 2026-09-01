@@ -70,9 +70,13 @@ services:
       AUTH_MODE: local
       DATABASE_URL: postgresql://erp_admin:local_dev_password@postgres:5432/erp
       PORT: 3000
+      FRONTEND_URL: http://localhost:5173
       AWS_REGION: us-east-1
       COGNITO_USER_POOL_ID: unused-in-local-mode
       COGNITO_CLIENT_ID: unused-in-local-mode
+      COGNITO_CLIENT_SECRET: unused-in-local-mode
+      COGNITO_DOMAIN: unused-in-local-mode
+      COGNITO_CALLBACK_URL: unused-in-local-mode
       DOCUMENTS_BUCKET: erp-local-documents
       # S3_ENDPOINT is the container-to-container address the backend uses
       # to talk to MinIO directly; S3_PUBLIC_ENDPOINT is what gets baked

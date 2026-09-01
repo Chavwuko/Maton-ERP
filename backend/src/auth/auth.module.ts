@@ -2,12 +2,16 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { APP_GUARD, Reflector } from '@nestjs/core';
 import { PrismaService } from '../database/prisma.service';
+import { AuthController } from './auth.controller';
 import { CognitoAuthGuard } from './cognito-auth.guard';
+import { CognitoOAuthService } from './cognito-oauth.service';
 import { LocalDevAuthGuard } from './local-dev-auth.guard';
 import { RolesGuard } from './roles.guard';
 
 @Module({
+  controllers: [AuthController],
   providers: [
+    CognitoOAuthService,
     // Order matters: authentication runs before role authorization.
     //
     // AUTH_MODE=local (see backend/.env.local.example) swaps in

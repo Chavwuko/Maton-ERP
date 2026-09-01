@@ -43,7 +43,7 @@ resource "aws_iam_role_policy" "ecs_execution_secrets" {
     Statement = [{
       Effect   = "Allow"
       Action   = ["secretsmanager:GetSecretValue"]
-      Resource = [aws_secretsmanager_secret.db_credentials.arn]
+      Resource = [aws_secretsmanager_secret.db_credentials.arn, aws_secretsmanager_secret.cognito_client_secret.arn]
     }]
   })
 }
@@ -105,10 +105,14 @@ resource "aws_ecs_task_definition" "backend" {
         { name = "AWS_REGION", value = var.aws_region },
         { name = "COGNITO_USER_POOL_ID", value = aws_cognito_user_pool.main.id },
         { name = "COGNITO_CLIENT_ID", value = aws_cognito_user_pool_client.backend.id },
+        { name = "COGNITO_DOMAIN", value = "${aws_cognito_user_pool_domain.main.domain}.auth.${var.aws_region}.amazoncognito.com" },
+        { name = "COGNITO_CALLBACK_URL", value = var.cognito_callback_urls[0] },
+        { name = "FRONTEND_URL", value = var.frontend_url },
         { name = "DOCUMENTS_BUCKET", value = aws_s3_bucket.documents.bucket },
       ]
       secrets = [
-        { name = "DATABASE_URL", valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:url::" }
+        { name = "DATABASE_URL", valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:url::" },
+        { name = "COGNITO_CLIENT_SECRET", valueFrom = aws_secretsmanager_secret.cognito_client_secret.arn }
       ]
       logConfiguration = {
         logDriver = "awslogs"

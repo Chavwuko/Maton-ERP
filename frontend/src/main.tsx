@@ -6,6 +6,7 @@ import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
+import { AuthGate } from './auth/AuthGate';
 import { RoleProvider } from './auth/RoleContext';
 import App from './App';
 
@@ -17,9 +18,11 @@ createRoot(document.getElementById('root')!).render(
       <Notifications />
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <RoleProvider>
-            <App />
-          </RoleProvider>
+          <AuthGate>
+            <RoleProvider>
+              <App />
+            </RoleProvider>
+          </AuthGate>
         </BrowserRouter>
       </QueryClientProvider>
     </MantineProvider>

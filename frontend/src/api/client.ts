@@ -1,3 +1,4 @@
+import { getAuthMode } from '../auth/authMode';
 import { getCurrentRole } from '../auth/roleStore';
 
 const BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
@@ -13,13 +14,20 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+  // AUTH_MODE=cognito carries identity in the erp_session cookie
+  // (credentials: 'include' below) instead of this dev-only header.
+  if (getAuthMode() === 'local') {
+    headers['x-local-role'] = getCurrentRole();
+  }
+
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      'x-local-role': getCurrentRole(),
-      ...init?.headers,
-    },
+    headers,
+    credentials: 'include',
   });
 
   if (!res.ok) {
