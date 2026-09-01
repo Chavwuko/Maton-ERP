@@ -74,7 +74,13 @@ services:
       COGNITO_USER_POOL_ID: unused-in-local-mode
       COGNITO_CLIENT_ID: unused-in-local-mode
       DOCUMENTS_BUCKET: erp-local-documents
+      # S3_ENDPOINT is the container-to-container address the backend uses
+      # to talk to MinIO directly; S3_PUBLIC_ENDPOINT is what gets baked
+      # into presigned download URLs, which a browser on the host requests
+      # instead — "minio" isn't resolvable there, but this maps to the same
+      # container via the "9000:9000" port publish below.
       S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
       S3_ACCESS_KEY_ID: minioadmin
       S3_SECRET_ACCESS_KEY: minioadmin
     ports:

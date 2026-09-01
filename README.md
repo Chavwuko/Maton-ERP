@@ -464,11 +464,30 @@ plain `fetch` (CORS is wide open via `app.enableCors()` in
 `react-router-dom` for routing, `@tanstack/react-query` for server-state
 caching, and Mantine (`@mantine/core`/`form`/`notifications`) for UI.
 
-**Only Organizations + Departments have a UI so far** — one full module
-(list → detail → create → update, RBAC-aware) built end-to-end as the
-template to copy for the rest. The nav sidebar lists every other module as
-"Coming soon" so the UI itself doubles as a visible roadmap; flip an item
-over to a real route as its module gets built.
+**Every module now has a UI** (Organizations/Departments, Document
+Control, Project Control, Assets, Maintenance, Inventory, Accounting,
+HSE, HR) — list/detail/create pages, RBAC-gated on `useRole()` to match
+each route's backend `@Roles(...)`, and a shared `StatusMenu` component
+(`src/components/StatusMenu.tsx`) that only ever offers the next statuses
+each module's `ALLOWED_TRANSITIONS` map actually permits. A few UI-only
+gaps, called out inline where they show up: several forms (work order
+assignment, corrective-action assignee, document reviewers, employee
+`userId`) take a raw user-id string rather than a picker, since there's
+no user-listing endpoint exposed to the frontend yet.
+
+**Fixed**: Document Control's presigned download URLs used to be
+generated using the backend's `S3_ENDPOINT` (`http://minio:9000` in the
+fully-containerized compose setup) — that hostname only resolves inside
+the Docker network, so a "Download" click from a browser on the host
+machine would fail to load the link even though the API call itself
+succeeded. `StorageService` now signs download URLs with a separate
+`S3_PUBLIC_ENDPOINT` client when one is configured (docker-compose.yml
+sets it to `http://localhost:9000` — port `9000` is already published to
+the host, mapped to the same MinIO container) and falls back to the
+internal `S3_ENDPOINT` client otherwise, which is what real AWS uses
+anyway (no such internal/external split there). Verified with a real
+`Invoke-WebRequest` against a live presigned URL, not just that the API
+call succeeds.
 
 There's no real login yet: instead of wiring Cognito's OAuth flow this
 early, the header has an "Acting as" role switcher that sends whatever role
@@ -493,14 +512,17 @@ Visit `http://localhost:5173`. `npm run build` produces a static
 rendering, so it can be hosted from any static file host once there's
 somewhere to point it at.
 
-**Adding the next module's UI**: copy `src/modules/organizations/`'s
-shape — `src/api/<module>.ts` for typed request functions, a
+**The pattern every module's UI follows**, worth knowing before changing
+one: `src/api/<module>.ts` for typed request functions, a
 `<Module>ListPage.tsx` and (if it has a workflow) a
-`<Module>DetailPage.tsx` using `useQuery`/`useMutation`, gate
-mutation-triggering buttons on `useRole()` matching the backend's
-`@Roles(...)` on that route, then flip its `AppNav` entry over to a `path`
-and add the route in `App.tsx`. Copy `OrganizationsListPage.test.tsx`'s
-shape for its tests too — see below.
+`<Module>DetailPage.tsx` using `useQuery`/`useMutation`, mutation-triggering
+buttons gated on `useRole()` to match the backend's `@Roles(...)` on that
+route, and status changes routed through `StatusMenu` with the module's
+own `*_TRANSITIONS` map (defined next to its types in
+`src/modules/<module>/types.ts`) so the UI can never even attempt an
+illegal transition. `src/modules/organizations/` and
+`src/modules/maintenance/` are the two most worth reading first — the
+former for the plain CRUD shape, the latter for the status-workflow one.
 
 ### Frontend tests (`npm test`)
 
@@ -514,16 +536,33 @@ npm run test:watch
 
 `roleStore.test.ts`/`client.test.ts` unit-test the pure logic (localStorage
 persistence, request/error handling — `fetch` is mocked, no backend
-needed). `OrganizationsListPage.test.tsx` is the component-level template:
-renders against a mocked `api/organizations` module (not real HTTP) inside
-`renderWithProviders` (Mantine/react-query/router/RoleProvider wired up),
-and covers the same shape worth testing in every future module's page —
-data rendering, empty state, RBAC-gated buttons, a mutation's happy path,
-and client-side validation. `src/test/setup.ts` also carries two jsdom
-workarounds every new test file gets for free: a `matchMedia` stub Mantine
-needs, and a `localStorage` polyfill (Node 22+'s experimental native
-`localStorage` global can shadow jsdom's own working one and make every
-call throw — see the comment there for why this isn't just a CLI flag).
+needed). Every module has at least a `<Module>ListPage.test.tsx` (plain
+CRUD: data rendering, empty state, RBAC-gated buttons, a mutation's happy
+path, client-side validation — start from `OrganizationsListPage.test.tsx`
+for the shape), and every module with a status workflow also has a
+`<Module>DetailPage.test.tsx` covering `StatusMenu` (only the legal next
+statuses are offered, a terminal status collapses to a plain badge,
+picking one calls the right mutation, a non-manager role sees no menu at
+all — `MaintenanceDetailPage.test.tsx` is the clearest example). All of
+them render against a mocked API module (not real HTTP) inside
+`renderWithProviders` (Mantine/react-query/router/RoleProvider wired up).
+
+`src/test/setup.ts` carries the jsdom workarounds every test file gets for
+free — worth reading before debugging a new failure that looks
+environment-related rather than logic-related: a `localStorage` polyfill
+(Node 22+'s experimental native `localStorage` global can shadow jsdom's
+own working one and make every call throw), plus stubs for `matchMedia`,
+`ResizeObserver`, and `scrollIntoView`, none of which jsdom implements but
+Mantine's `Select`/`Combobox`/`ScrollArea` all call. Two query patterns
+worth knowing when writing a new test: Mantine's `Select` doesn't expose
+its `<input>` via `getByLabelText` the normal way, so query it by
+`findByPlaceholderText(...)` instead; and a `Select`'s dropdown mounts
+asynchronously (like `Modal`/`Menu`), so the first query into freshly
+opened modal/dropdown content needs `findBy*`, not `getBy*`. Running the
+full suite in parallel (all `npm test` does) also needs a higher
+`testTimeout` (set in `vite.config.ts`) than any single file needs in
+isolation, since many files' jsdom+React+Mantine environments competing
+for CPU can push one file's async modal-open past the 5s default.
 
 ## Testing
 

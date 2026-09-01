@@ -35,3 +35,11 @@ export function setCurrentRole(role: Role): void {
   currentRole = role;
   localStorage.setItem(STORAGE_KEY, role);
 }
+
+// Mirrors a route's @Roles(...) decorator — 'admin' isn't implicitly
+// included, matching the backend (RolesGuard special-cases 'admin' itself,
+// but every @Roles(...) list in this codebase already lists it explicitly).
+export function hasRole(current: Role, allowed: Role[]): boolean {
+  return allowed.includes(current);
+}
+

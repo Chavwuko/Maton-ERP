@@ -22,6 +22,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 export class StorageService implements OnModuleInit {
   private readonly logger = new Logger(StorageService.name);
   private readonly client: S3Client;
+  private readonly publicClient: S3Client;
   private readonly bucket: string;
   private readonly isLocal: boolean;
 
@@ -30,19 +31,31 @@ export class StorageService implements OnModuleInit {
     this.isLocal = !!endpoint;
     this.bucket = this.config.getOrThrow<string>('DOCUMENTS_BUCKET');
 
+    const region = this.config.get<string>('AWS_REGION') ?? 'us-east-1';
+    const credentials = endpoint
+      ? {
+          accessKeyId: this.config.get<string>('S3_ACCESS_KEY_ID') ?? 'minioadmin',
+          secretAccessKey: this.config.get<string>('S3_SECRET_ACCESS_KEY') ?? 'minioadmin',
+        }
+      : undefined;
+
     this.client = new S3Client({
-      region: this.config.get<string>('AWS_REGION') ?? 'us-east-1',
-      ...(endpoint
-        ? {
-            endpoint,
-            forcePathStyle: true, // required for MinIO's path-style URLs
-            credentials: {
-              accessKeyId: this.config.get<string>('S3_ACCESS_KEY_ID') ?? 'minioadmin',
-              secretAccessKey: this.config.get<string>('S3_SECRET_ACCESS_KEY') ?? 'minioadmin',
-            },
-          }
-        : {}),
+      region,
+      ...(endpoint ? { endpoint, forcePathStyle: true, credentials } : {}),
     });
+
+    // `endpoint` (e.g. "http://minio:9000") is only reachable from inside
+    // the Docker network — the backend uses it directly for put/head/create.
+    // A browser downloading a presigned URL runs on the host instead, so
+    // presigned URLs need a host-reachable endpoint. S3_PUBLIC_ENDPOINT
+    // (e.g. "http://localhost:9000", mapped to the same MinIO container in
+    // docker-compose.yml) covers that; it's irrelevant in real AWS, where
+    // S3 has no such internal/external split and this just falls back to
+    // the same client.
+    const publicEndpoint = this.config.get<string>('S3_PUBLIC_ENDPOINT');
+    this.publicClient = publicEndpoint
+      ? new S3Client({ region, endpoint: publicEndpoint, forcePathStyle: true, credentials })
+      : this.client;
   }
 
   async onModuleInit() {
@@ -70,7 +83,7 @@ export class StorageService implements OnModuleInit {
   }
 
   getDownloadUrl(key: string, expiresInSeconds = 300): Promise<string> {
-    return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
+    return getSignedUrl(this.publicClient, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
       expiresIn: expiresInSeconds,
     });
   }

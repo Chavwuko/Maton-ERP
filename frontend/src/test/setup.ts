@@ -65,3 +65,21 @@ if (!window.matchMedia) {
       dispatchEvent: () => false,
     }) as MediaQueryList;
 }
+
+// jsdom doesn't implement ResizeObserver either; Mantine's ScrollArea
+// (used inside Select's dropdown, among others) needs it to exist.
+if (!globalThis.ResizeObserver) {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
+// Nor scrollIntoView — Mantine's Combobox (Select's dropdown) calls it on a
+// delayed timer to auto-scroll the active option, which otherwise throws
+// an unhandled "not a function" after the test that opened it has already
+// finished and torn down.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}

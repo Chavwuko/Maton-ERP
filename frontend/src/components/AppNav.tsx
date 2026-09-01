@@ -7,14 +7,14 @@ import { Link, useLocation } from 'react-router-dom';
 // module's frontend lands.
 const NAV_ITEMS: Array<{ label: string; path?: string }> = [
   { label: 'Organizations', path: '/organizations' },
-  { label: 'Document Control' },
-  { label: 'Project Control' },
-  { label: 'Assets' },
-  { label: 'Maintenance' },
-  { label: 'Inventory' },
-  { label: 'Accounting' },
-  { label: 'HSE' },
-  { label: 'HR' },
+  { label: 'Document Control', path: '/documents' },
+  { label: 'Project Control', path: '/projects' },
+  { label: 'Assets', path: '/assets' },
+  { label: 'Maintenance', path: '/maintenance' },
+  { label: 'Inventory', path: '/inventory' },
+  { label: 'Accounting', path: '/accounting' },
+  { label: 'HSE', path: '/hse' },
+  { label: 'HR', path: '/hr' },
 ];
 
 export function AppNav() {

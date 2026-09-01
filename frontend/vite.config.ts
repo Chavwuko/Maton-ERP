@@ -8,5 +8,10 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // Default 5000ms is comfortable per-file, but many files running their
+    // jsdom+React+Mantine environments in parallel (the full-suite case)
+    // can push a single async modal-open past it under CPU contention even
+    // though the same test is instant in isolation.
+    testTimeout: 15000,
   },
 })

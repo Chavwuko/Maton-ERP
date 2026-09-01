@@ -7,7 +7,9 @@ const sendMock = jest.fn();
 // itself works. Each mocked Command class just echoes its constructor
 // input back so assertions can inspect it.
 jest.mock('@aws-sdk/client-s3', () => ({
-  S3Client: jest.fn().mockImplementation(() => ({ send: sendMock })),
+  // Stashes the config each instance was built with, so tests can tell
+  // which of possibly two S3Client instances a given call used.
+  S3Client: jest.fn().mockImplementation((config) => ({ send: sendMock, __config: config })),
   HeadBucketCommand: jest.fn().mockImplementation((input) => ({ commandName: 'HeadBucketCommand', input })),
   CreateBucketCommand: jest.fn().mockImplementation((input) => ({ commandName: 'CreateBucketCommand', input })),
   PutObjectCommand: jest.fn().mockImplementation((input) => ({ commandName: 'PutObjectCommand', input })),
@@ -75,6 +77,33 @@ describe('StorageService', () => {
       expect(S3Client).toHaveBeenCalledWith(
         expect.objectContaining({ credentials: { accessKeyId: 'minioadmin', secretAccessKey: 'minioadmin' } }),
       );
+    });
+
+    it('builds a second client for S3_PUBLIC_ENDPOINT when configured (container vs. host address)', () => {
+      new StorageService(
+        fakeConfig({
+          DOCUMENTS_BUCKET: 'local-bucket',
+          S3_ENDPOINT: 'http://minio:9000',
+          S3_PUBLIC_ENDPOINT: 'http://localhost:9000',
+        }),
+      );
+
+      expect(S3Client).toHaveBeenCalledTimes(2);
+      expect(S3Client).toHaveBeenNthCalledWith(1, expect.objectContaining({ endpoint: 'http://minio:9000' }));
+      expect(S3Client).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          endpoint: 'http://localhost:9000',
+          forcePathStyle: true,
+          credentials: { accessKeyId: 'minioadmin', secretAccessKey: 'minioadmin' },
+        }),
+      );
+    });
+
+    it('does not build a second client when S3_PUBLIC_ENDPOINT is unset', () => {
+      new StorageService(fakeConfig({ DOCUMENTS_BUCKET: 'local-bucket', S3_ENDPOINT: 'http://minio:9000' }));
+
+      expect(S3Client).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -158,6 +187,34 @@ describe('StorageService', () => {
       await service.getDownloadUrl('key', 60);
 
       expect(getSignedUrl).toHaveBeenCalledWith(expect.anything(), expect.anything(), { expiresIn: 60 });
+    });
+
+    it('signs with the S3_PUBLIC_ENDPOINT client, not the internal one, when both are configured', async () => {
+      (getSignedUrl as jest.Mock).mockResolvedValue('https://localhost/signed-url');
+      const service = new StorageService(
+        fakeConfig({
+          DOCUMENTS_BUCKET: 'local-bucket',
+          S3_ENDPOINT: 'http://minio:9000',
+          S3_PUBLIC_ENDPOINT: 'http://localhost:9000',
+        }),
+      );
+
+      await service.getDownloadUrl('key');
+
+      const clientArg = (getSignedUrl as jest.Mock).mock.calls[0][0];
+      expect(clientArg.__config).toEqual(expect.objectContaining({ endpoint: 'http://localhost:9000' }));
+    });
+
+    it('falls back to the same client used for uploads when S3_PUBLIC_ENDPOINT is unset', async () => {
+      (getSignedUrl as jest.Mock).mockResolvedValue('https://minio/signed-url');
+      const service = new StorageService(
+        fakeConfig({ DOCUMENTS_BUCKET: 'local-bucket', S3_ENDPOINT: 'http://minio:9000' }),
+      );
+
+      await service.getDownloadUrl('key');
+
+      const clientArg = (getSignedUrl as jest.Mock).mock.calls[0][0];
+      expect(clientArg.__config).toEqual(expect.objectContaining({ endpoint: 'http://minio:9000' }));
     });
   });
 });
