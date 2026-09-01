@@ -9,6 +9,7 @@ import { createCorrectiveAction, getIncident, updateCorrectiveAction, updateInci
 import { useRole } from '../../auth/RoleContext';
 import { hasRole } from '../../auth/roleStore';
 import { StatusMenu } from '../../components/StatusMenu';
+import { UserSelect } from '../../components/UserSelect';
 import {
   CORRECTIVE_ACTION_STATUS_COLORS,
   CORRECTIVE_ACTION_TRANSITIONS,
@@ -191,12 +192,7 @@ export function HseDetailPage() {
         <form noValidate onSubmit={createForm.onSubmit((values) => createActionMutation.mutate(values))}>
           <Stack>
             <TextInput label="Description" required {...createForm.getInputProps('description')} />
-            <TextInput
-              label="Assigned-to user id"
-              description="User id (UUID) — no user picker yet"
-              required
-              {...createForm.getInputProps('assignedToId')}
-            />
+            <UserSelect label="Assigned to" required {...createForm.getInputProps('assignedToId')} />
             <TextInput type="date" label="Due date" required {...createForm.getInputProps('dueDate')} />
             <Group justify="flex-end">
               <Button type="submit" loading={createActionMutation.isPending}>

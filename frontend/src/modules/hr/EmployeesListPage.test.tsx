@@ -10,6 +10,11 @@ vi.mock('../../api/hr');
 vi.mock('../../api/organizations', () => ({
   listOrganizations: vi.fn().mockResolvedValue([{ id: 'org-1', name: 'Acme Industrial' }]),
 }));
+vi.mock('../../api/users', () => ({
+  listUsers: vi.fn().mockResolvedValue([
+    { id: 'user-2', email: 'jane@acme.test', firstName: 'Jane', lastName: 'Doe', isActive: true, role: null },
+  ]),
+}));
 
 const sampleEmployees = [
   {
@@ -70,7 +75,8 @@ describe('EmployeesListPage', () => {
     await user.click(screen.getByRole('button', { name: 'New employee' }));
     await user.click(await screen.findByPlaceholderText('Select organization'));
     await user.click(await screen.findByText('Acme Industrial'));
-    await user.type(screen.getByLabelText('User id', { exact: false }), 'user-2');
+    await user.click(await screen.findByPlaceholderText('Select user'));
+    await user.click(await screen.findByText('Jane Doe (jane@acme.test)'));
     await user.type(screen.getByLabelText('Employee number', { exact: false }), 'EMP-002');
     await user.type(screen.getByLabelText('Job title', { exact: false }), 'Site Supervisor');
     await user.type(screen.getByLabelText('Hire date', { exact: false }), '2026-01-01');

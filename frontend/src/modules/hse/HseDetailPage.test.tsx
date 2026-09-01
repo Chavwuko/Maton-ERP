@@ -8,6 +8,11 @@ import { HseDetailPage } from './HseDetailPage';
 import type { Incident } from './types';
 
 vi.mock('../../api/hse');
+vi.mock('../../api/users', () => ({
+  listUsers: vi.fn().mockResolvedValue([
+    { id: 'user-2', email: 'jane@acme.test', firstName: 'Jane', lastName: 'Doe', isActive: true, role: null },
+  ]),
+}));
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
   return { ...actual, useParams: () => ({ id: 'inc-1' }) };
@@ -103,7 +108,8 @@ describe('HseDetailPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'New corrective action' }));
     await user.type(await screen.findByLabelText('Description', { exact: false }), 'Add non-slip mat');
-    await user.type(screen.getByLabelText('Assigned-to user id', { exact: false }), 'user-2');
+    await user.click(await screen.findByPlaceholderText('Select user'));
+    await user.click(await screen.findByText('Jane Doe (jane@acme.test)'));
     await user.type(screen.getByLabelText('Due date', { exact: false }), '2026-02-01');
     await user.click(screen.getByRole('button', { name: 'Create' }));
 

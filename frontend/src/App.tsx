@@ -25,6 +25,7 @@ import { EmployeeDetailPage } from './modules/hr/EmployeeDetailPage';
 import { EmployeesListPage } from './modules/hr/EmployeesListPage';
 import { DocumentDetailPage } from './modules/document-control/DocumentDetailPage';
 import { DocumentsListPage } from './modules/document-control/DocumentsListPage';
+import { UsersListPage } from './modules/users/UsersListPage';
 
 export default function App() {
   return (
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="/hr/appraisals/:id" element={<AppraisalDetailPage />} />
         <Route path="/documents" element={<DocumentsListPage />} />
         <Route path="/documents/:id" element={<DocumentDetailPage />} />
+        <Route path="/users" element={<UsersListPage />} />
       </Routes>
     </AppShell>
   );

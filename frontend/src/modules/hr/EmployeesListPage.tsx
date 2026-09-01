@@ -8,6 +8,7 @@ import { createEmployee, listEmployees } from '../../api/hr';
 import { ApiError } from '../../api/client';
 import { EmployeeSelect } from '../../components/EmployeeSelect';
 import { OrganizationSelect } from '../../components/OrganizationSelect';
+import { UserSelect } from '../../components/UserSelect';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useRole } from '../../auth/RoleContext';
 import { hasRole } from '../../auth/roleStore';
@@ -29,7 +30,7 @@ export function EmployeesListPage() {
     initialValues: { organizationId: '', userId: '', employeeNumber: '', jobTitle: '', hireDate: '', managerId: '' },
     validate: {
       organizationId: (value) => (value ? null : 'Organization is required'),
-      userId: (value) => (value.trim() ? null : 'User id is required'),
+      userId: (value) => (value ? null : 'User is required'),
       employeeNumber: (value) => (value.trim() ? null : 'Employee number is required'),
       jobTitle: (value) => (value.trim() ? null : 'Job title is required'),
       hireDate: (value) => (value ? null : 'Hire date is required'),
@@ -110,12 +111,7 @@ export function EmployeesListPage() {
         <form noValidate onSubmit={form.onSubmit((values) => createMutation.mutate(values))}>
           <Stack>
             <OrganizationSelect required {...form.getInputProps('organizationId')} />
-            <TextInput
-              label="User id"
-              description="User id (UUID) — no user picker yet"
-              required
-              {...form.getInputProps('userId')}
-            />
+            <UserSelect required {...form.getInputProps('userId')} />
             <TextInput label="Employee number" placeholder="EMP-001" required {...form.getInputProps('employeeNumber')} />
             <TextInput label="Job title" required {...form.getInputProps('jobTitle')} />
             <TextInput type="date" label="Hire date" required {...form.getInputProps('hireDate')} />

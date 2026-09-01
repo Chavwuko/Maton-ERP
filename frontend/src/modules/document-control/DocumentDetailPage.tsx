@@ -7,7 +7,10 @@ import { notifications } from '@mantine/notifications';
 import { ApiError } from '../../api/client';
 import { addDocumentVersion, getDocument, getDownloadUrl, recordDecision, submitForReview } from '../../api/documentControl';
 import { StatusBadge } from '../../components/StatusBadge';
+import { UserMultiSelect } from '../../components/UserMultiSelect';
 import { DOCUMENT_STATUS_COLORS } from './types';
+
+const REVIEWER_ROLES = ['document_control', 'admin'];
 
 export function DocumentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -33,8 +36,8 @@ export function DocumentDetailPage() {
   });
 
   const submitForm = useForm({
-    initialValues: { reviewerIds: '' },
-    validate: { reviewerIds: (value) => (value.trim() ? null : 'At least one reviewer id is required') },
+    initialValues: { reviewerIds: [] as string[] },
+    validate: { reviewerIds: (value) => (value.length ? null : 'At least one reviewer is required') },
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['documents', id] });
@@ -52,11 +55,7 @@ export function DocumentDetailPage() {
   });
 
   const submitMutation = useMutation({
-    mutationFn: (values: typeof submitForm.values) =>
-      submitForReview(
-        id!,
-        values.reviewerIds.split(',').map((v) => v.trim()).filter(Boolean),
-      ),
+    mutationFn: (values: typeof submitForm.values) => submitForReview(id!, values.reviewerIds),
     onSuccess: () => {
       invalidate();
       notifications.show({ message: 'Submitted for review', color: 'green' });
@@ -190,9 +189,9 @@ export function DocumentDetailPage() {
       <Modal opened={submitOpen} onClose={() => setSubmitOpen(false)} title="Submit for review">
         <form noValidate onSubmit={submitForm.onSubmit((values) => submitMutation.mutate(values))}>
           <Stack>
-            <TextInput
-              label="Reviewer user ids"
-              description="Comma-separated user ids (UUID) — no user picker yet. Each must have the document_control or admin role."
+            <UserMultiSelect
+              label="Reviewers"
+              role={REVIEWER_ROLES}
               required
               {...submitForm.getInputProps('reviewerIds')}
             />

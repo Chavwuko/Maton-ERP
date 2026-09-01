@@ -15,6 +15,7 @@ const NAV_ITEMS: Array<{ label: string; path?: string }> = [
   { label: 'Accounting', path: '/accounting' },
   { label: 'HSE', path: '/hse' },
   { label: 'HR', path: '/hr' },
+  { label: 'Users', path: '/users' },
 ];
 
 export function AppNav() {

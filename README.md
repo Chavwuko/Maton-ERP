@@ -375,6 +375,27 @@ any count ≥ 1).
   approvals, Accounting's payments, HSE's corrective actions). Before that,
   it's `IN_PROGRESS` once at least one review is in.
 
+## Users directory
+
+A read-only directory over the `User` table — there's no create/update here:
+`User` rows are lazily created by the auth guards on first login (see "How
+authentication works"), so the directory only ever reads what's already
+there.
+
+- `GET /users` (query: `role?` — repeatable, e.g. `?role=admin&role=hse`;
+  `isActive?`) — list, open to any authenticated user (no `@Roles(...)`).
+  Used both by the `/users` directory page and by every `UserSelect` /
+  `UserMultiSelect` picker in the frontend.
+- `GET /users/:id` — detail with role nested; 404 if missing.
+
+**Frontend**: `UserSelect` (single) and `UserMultiSelect` (multiple) in
+`frontend/src/components/` replace the raw-UUID `TextInput` fields that used
+to appear across Maintenance (work order assignment), HSE (corrective
+action assignee), Document Control (submit-for-review's reviewer list,
+filtered to `document_control`/`admin`), and HR (new employee's `userId`).
+Both fall back to showing the email when a lazily-created user still has
+blank first/last name.
+
 ## Adding a new module
 
 1. `backend/src/modules/<name>/` with its own `.module.ts`, `.controller.ts`,

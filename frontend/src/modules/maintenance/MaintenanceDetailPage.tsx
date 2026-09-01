@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Anchor, Button, Group, Loader, Modal, Stack, Table, TextInput, Title } from '@mantine/core';
+import { Alert, Anchor, Button, Group, Loader, Modal, Stack, Table, Title } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { ApiError } from '../../api/client';
@@ -9,6 +9,7 @@ import { assignWorkOrder, getWorkOrder, updateWorkOrderStatus } from '../../api/
 import { useRole } from '../../auth/RoleContext';
 import { hasRole } from '../../auth/roleStore';
 import { StatusMenu } from '../../components/StatusMenu';
+import { UserSelect } from '../../components/UserSelect';
 import { WORK_ORDER_STATUS_COLORS, WORK_ORDER_TRANSITIONS, type WorkOrderStatus } from './types';
 
 export function MaintenanceDetailPage() {
@@ -28,7 +29,10 @@ export function MaintenanceDetailPage() {
     enabled: !!id,
   });
 
-  const assignForm = useForm({ initialValues: { assignedToId: '' } });
+  const assignForm = useForm({
+    initialValues: { assignedToId: '' },
+    validate: { assignedToId: (value) => (value ? null : 'Assignee is required') },
+  });
 
   const statusMutation = useMutation({
     mutationFn: (status: WorkOrderStatus) => updateWorkOrderStatus(id!, status),
@@ -122,12 +126,7 @@ export function MaintenanceDetailPage() {
       <Modal opened={assignOpen} onClose={() => setAssignOpen(false)} title="Assign work order">
         <form noValidate onSubmit={assignForm.onSubmit((values) => assignMutation.mutate(values))}>
           <Stack>
-            <TextInput
-              label="Assigned-to user id"
-              description="User id (UUID) — no user picker yet"
-              required
-              {...assignForm.getInputProps('assignedToId')}
-            />
+            <UserSelect label="Assigned to" required {...assignForm.getInputProps('assignedToId')} />
             <Group justify="flex-end">
               <Button type="submit" loading={assignMutation.isPending}>
                 Save
