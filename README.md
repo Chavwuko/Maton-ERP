@@ -1,5 +1,7 @@
 # ERP Foundations
 
+[![CI](https://github.com/Chavwuko/Maton-ERP/actions/workflows/ci.yml/badge.svg)](https://github.com/Chavwuko/Maton-ERP/actions/workflows/ci.yml)
+
 Core platform for the multi-department ERP: authentication, the shared data
 model, and base AWS infrastructure. Every future module (Document Control,
 Heavy-Duty Maintenance, Project Control, HSE, Inventory, Accounting, HR)
