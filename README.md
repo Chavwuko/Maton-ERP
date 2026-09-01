@@ -12,7 +12,8 @@ tenancy, or the org/department/project/asset model from scratch.
 
 ```
 erp-foundations/
-├── infra/              Terraform for AWS (VPC, RDS, ECS Fargate, Cognito, S3, ECR)
+├── infra/               Terraform for AWS (VPC, RDS, ECS Fargate, Cognito, S3, ECR)
+├── frontend/            React + TypeScript + Vite SPA — see "Frontend" below
 └── backend/             NestJS API
     ├── prisma/           Schema + seed script (source of truth for the DB)
     ├── test/             e2e test suite (one spec file per module) — see Testing below
@@ -25,6 +26,7 @@ erp-foundations/
         └── modules/
             ├── organizations/      Reference implementation — copy this
             │                       folder's shape for new feature modules
+            ├── departments/        CRUD nested under Organization (rename via PATCH)
             ├── document-control/   Versioned documents + draft → review →
             │                       approval workflow, files in S3/MinIO
             ├── projects/           Project CRUD, status workflow, milestones
@@ -453,6 +455,51 @@ Rebuild after changing backend source with `docker compose up --build -d
 backend` — Docker only re-runs `npm run build` and later layers if `npm ci`'s
 inputs (`package.json`/`package-lock.json`) haven't changed, so this is fast
 after the first build.
+
+## Frontend
+
+React + TypeScript + Vite SPA in `frontend/`, talking to the backend over
+plain `fetch` (CORS is wide open via `app.enableCors()` in
+`backend/src/main.ts`, so no proxy is needed for local dev). Stack:
+`react-router-dom` for routing, `@tanstack/react-query` for server-state
+caching, and Mantine (`@mantine/core`/`form`/`notifications`) for UI.
+
+**Only Organizations + Departments have a UI so far** — one full module
+(list → detail → create → update, RBAC-aware) built end-to-end as the
+template to copy for the rest. The nav sidebar lists every other module as
+"Coming soon" so the UI itself doubles as a visible roadmap; flip an item
+over to a real route as its module gets built.
+
+There's no real login yet: instead of wiring Cognito's OAuth flow this
+early, the header has an "Acting as" role switcher that sends whatever role
+you pick as the `x-local-role` header on every request — the same
+mechanism `AUTH_MODE=local` uses on the backend (see `LocalDevAuthGuard`).
+Switching roles invalidates every cached query, so RBAC-gated buttons
+(e.g. "New department" only shows for `admin`) update immediately.
+
+```bash
+# Backend must already be reachable at localhost:3000 (either
+# `npm run start:dev` or the fully-containerized `docker compose up -d`
+# from Local development above)
+
+cd frontend
+cp .env.example .env   # VITE_API_BASE_URL — defaults to http://localhost:3000
+npm install
+npm run dev
+```
+
+Visit `http://localhost:5173`. `npm run build` produces a static
+`dist/` bundle (typechecked via `tsc -b` first); there's no server-side
+rendering, so it can be hosted from any static file host once there's
+somewhere to point it at.
+
+**Adding the next module's UI**: copy `src/modules/organizations/`'s
+shape — `src/api/<module>.ts` for typed request functions, a
+`<Module>ListPage.tsx` and (if it has a workflow) a
+`<Module>DetailPage.tsx` using `useQuery`/`useMutation`, gate
+mutation-triggering buttons on `useRole()` matching the backend's
+`@Roles(...)` on that route, then flip its `AppNav` entry over to a `path`
+and add the route in `App.tsx`.
 
 ## Testing
 
