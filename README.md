@@ -428,6 +428,30 @@ deploy with `AUTH_MODE=local` set anywhere reachable from the internet.
 To stop and remove the local database: `docker compose down` (add `-v` to
 also delete its data).
 
+### Fully containerized (backend included)
+
+The steps above run Postgres/MinIO in Docker but the backend itself as a
+dev server on your machine. To run the backend containerized too — the
+same image `infra/ecs.tf` deploys to AWS, not a dev-only setup — skip the
+`cd backend` steps entirely:
+
+```bash
+docker compose up --build -d
+```
+
+This builds the backend image, applies pending Prisma migrations and seeds
+roles via a one-shot `migrate` service, then starts the API — `postgres`,
+`minio`, and `backend` all restart automatically (`restart: unless-stopped`)
+if Docker or the machine restarts. Visit `http://localhost:3000/health` the
+same as above. `docker compose logs -f backend` follows its output; `docker
+compose down` stops everything (`up -d` again picks up right where it left
+off, since Postgres/MinIO data lives in named volumes).
+
+Rebuild after changing backend source with `docker compose up --build -d
+backend` — Docker only re-runs `npm run build` and later layers if `npm ci`'s
+inputs (`package.json`/`package-lock.json`) haven't changed, so this is fast
+after the first build.
+
 ## Testing
 
 Two complementary suites — run both; they catch different classes of bugs.

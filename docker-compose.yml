@@ -11,6 +11,11 @@ services:
       - "5432:5432"
     volumes:
       - erp_local_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp_admin -d erp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   # S3-compatible storage standing in for the documents bucket
   # (infra/storage.tf) so Document Control can be run locally with no AWS
@@ -30,6 +35,55 @@ services:
       - "9001:9001" # web console
     volumes:
       - erp_local_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # One-shot: applies pending Prisma migrations and upserts the seed roles,
+  # then exits. Uses the `build` stage (has the Prisma CLI + ts-node as
+  # devDependencies) rather than the lean `runtime` image the backend
+  # service runs from.
+  migrate:
+    build:
+      context: ./backend
+      target: build
+    container_name: erp-local-migrate
+    environment:
+      DATABASE_URL: postgresql://erp_admin:local_dev_password@postgres:5432/erp
+    command: sh -c "npx prisma migrate deploy && npx ts-node prisma/seed.ts"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # The same image `infra/ecs.tf` deploys to AWS (see backend/Dockerfile's
+  # `runtime` stage) — running it here validates the actual deployable
+  # artifact, not just the dev server.
+  backend:
+    build:
+      context: ./backend
+      target: runtime
+    container_name: erp-local-backend
+    restart: unless-stopped
+    environment:
+      AUTH_MODE: local
+      DATABASE_URL: postgresql://erp_admin:local_dev_password@postgres:5432/erp
+      PORT: 3000
+      AWS_REGION: us-east-1
+      COGNITO_USER_POOL_ID: unused-in-local-mode
+      COGNITO_CLIENT_ID: unused-in-local-mode
+      DOCUMENTS_BUCKET: erp-local-documents
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY_ID: minioadmin
+      S3_SECRET_ACCESS_KEY: minioadmin
+    ports:
+      - "3000:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
 
 volumes:
   erp_local_pg_data:
