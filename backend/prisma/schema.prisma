@@ -673,6 +673,20 @@ model Employee {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
+  // HR dashboard profile fields — nullable since they were added after
+  // employees already existed; `POST /employees` requires them for new
+  // hires (see CreateEmployeeDto), existing rows show as "Unknown" in
+  // dashboard breakdowns until backfilled via `PATCH /employees/:id`.
+  dateOfBirth    DateTime?
+  gender         Gender?
+  employmentType EmploymentType?
+  grade          EmployeeGrade?
+  branch         String?
+  // Last working day — drives both "Exits (This Year)" and "Relieving
+  // (This Quarter)" on the HR dashboard; set via PATCH when an employee's
+  // status moves to TERMINATED.
+  exitDate       DateTime?
+
   organization Organization @relation(fields: [organizationId], references: [id])
   user         User         @relation(fields: [userId], references: [id])
   manager      Employee?    @relation("EmployeeManager", fields: [managerId], references: [id])
@@ -690,6 +704,27 @@ enum EmploymentStatus {
   ACTIVE
   ON_LEAVE
   TERMINATED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  INTERN
+  CONTRACT
+  COMMUNITY
+}
+
+enum EmployeeGrade {
+  ENTRY
+  JUNIOR
+  SENIOR
+  MANAGEMENT
 }
 
 model AppraisalCycle {

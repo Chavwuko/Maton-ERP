@@ -3,6 +3,9 @@ export type AppraisalCycleStatus = 'DRAFT' | 'ACTIVE' | 'CLOSED';
 export type AppraisalStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
 export type AppraisalRelationType = 'SELF' | 'MANAGER' | 'PEER' | 'SUBORDINATE';
 export type AppraisalReviewStatus = 'PENDING' | 'SUBMITTED';
+export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
+export type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'INTERN' | 'CONTRACT' | 'COMMUNITY';
+export type EmployeeGrade = 'ENTRY' | 'JUNIOR' | 'SENIOR' | 'MANAGEMENT';
 
 export interface Employee {
   id: string;
@@ -15,8 +18,34 @@ export interface Employee {
   managerId: string | null;
   createdAt: string;
   updatedAt: string;
+  dateOfBirth: string | null;
+  gender: Gender | null;
+  employmentType: EmploymentType | null;
+  grade: EmployeeGrade | null;
+  branch: string | null;
+  exitDate: string | null;
   manager?: Employee | null;
   directReports?: Employee[];
+}
+
+export interface DashboardBucket {
+  label: string;
+  count: number;
+}
+
+export interface HrDashboard {
+  totalEmployees: number;
+  newHiresThisYear: number;
+  exitsThisYear: number;
+  relievingThisQuarter: number;
+  joiningThisQuarter: number;
+  byAgeRange: DashboardBucket[];
+  byGender: DashboardBucket[];
+  byEmploymentType: DashboardBucket[];
+  byGrade: DashboardBucket[];
+  byBranch: DashboardBucket[];
+  byDesignation: DashboardBucket[];
+  byDepartment: DashboardBucket[];
 }
 
 export interface AppraisalReviewer {
@@ -74,6 +103,27 @@ export const EMPLOYMENT_STATUS_COLORS: Record<EmploymentStatus, string> = {
   ACTIVE: 'green',
   ON_LEAVE: 'yellow',
   TERMINATED: 'gray',
+};
+
+export const GENDER_LABELS: Record<Gender, string> = {
+  MALE: 'Male',
+  FEMALE: 'Female',
+  OTHER: 'Other',
+};
+
+export const EMPLOYMENT_TYPE_LABELS: Record<EmploymentType, string> = {
+  FULL_TIME: 'Full-time',
+  PART_TIME: 'Part-time',
+  INTERN: 'Intern',
+  CONTRACT: 'Contract',
+  COMMUNITY: 'Community',
+};
+
+export const EMPLOYEE_GRADE_LABELS: Record<EmployeeGrade, string> = {
+  ENTRY: 'Entry',
+  JUNIOR: 'Junior',
+  SENIOR: 'Senior',
+  MANAGEMENT: 'Management',
 };
 
 export const APPRAISAL_CYCLE_STATUS_COLORS: Record<AppraisalCycleStatus, string> = {

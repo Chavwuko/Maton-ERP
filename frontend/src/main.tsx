@@ -6,6 +6,7 @@ import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
+import '@mantine/charts/styles.css';
 import { AuthGate } from './auth/AuthGate';
 import { RoleProvider } from './auth/RoleContext';
 import App from './App';

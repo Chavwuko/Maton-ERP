@@ -12,6 +12,6 @@ export default defineConfig({
     // jsdom+React+Mantine environments in parallel (the full-suite case)
     // can push a single async modal-open past it under CPU contention even
     // though the same test is instant in isolation.
-    testTimeout: 15000,
+    testTimeout: 20000,
   },
 })

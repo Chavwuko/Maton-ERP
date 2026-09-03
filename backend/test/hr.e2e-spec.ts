@@ -117,13 +117,63 @@ describe('HR (e2e)', () => {
       expect(res.status).toBe(404);
     });
 
-    it('TERMINATED is a terminal employment status', async () => {
+    it('TERMINATED is a terminal employment status, and defaults exitDate to today', async () => {
       await admin.patch(`/employees/${empMaint}/status`).send({ employmentStatus: 'ON_LEAVE' });
       const terminated = await admin.patch(`/employees/${empMaint}/status`).send({ employmentStatus: 'TERMINATED' });
       expect(terminated.status).toBe(200);
+      expect(new Date(terminated.body.exitDate).toDateString()).toBe(new Date().toDateString());
 
       const blocked = await admin.patch(`/employees/${empMaint}/status`).send({ employmentStatus: 'ACTIVE' });
       expect(blocked.status).toBe(400);
+    });
+
+    it('PATCH /employees/:id updates profile fields', async () => {
+      const res = await admin.patch(`/employees/${empDocControl}`).send({
+        gender: 'FEMALE',
+        employmentType: 'FULL_TIME',
+        grade: 'JUNIOR',
+        branch: 'Lagos HQ',
+        dateOfBirth: '1995-03-01T00:00:00.000Z',
+      });
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ gender: 'FEMALE', employmentType: 'FULL_TIME', grade: 'JUNIOR', branch: 'Lagos HQ' });
+    });
+  });
+
+  describe('dashboard', () => {
+    it('GET /employees/dashboard aggregates this organization\'s employees', async () => {
+      const res = await admin.get('/employees/dashboard').query({ organizationId: orgId });
+      expect(res.status).toBe(200);
+
+      expect(res.body.totalEmployees).toBe(5);
+      expect(res.body.newHiresThisYear).toBe(0);
+      expect(res.body.joiningThisQuarter).toBe(0);
+      // empMaint was terminated (exitDate defaulted to today) in the employees suite above.
+      expect(res.body.exitsThisYear).toBe(1);
+      expect(res.body.relievingThisQuarter).toBe(1);
+
+      expect(res.body.byDesignation).toEqual(
+        expect.arrayContaining([
+          { label: 'Operations Manager', count: 1 },
+          { label: 'Finance Lead', count: 1 },
+          { label: 'HSE Officer', count: 1 },
+          { label: 'Maintenance Analyst', count: 1 },
+          { label: 'Document Controller', count: 1 },
+        ]),
+      );
+      // Every employee except the one just backfilled with a PATCH above is still "Unknown".
+      expect(res.body.byGender).toEqual(
+        expect.arrayContaining([
+          { label: 'FEMALE', count: 1 },
+          { label: 'Unknown', count: 4 },
+        ]),
+      );
+    });
+
+    it('GET /employees/dashboard with no organizationId aggregates across all organizations', async () => {
+      const res = await admin.get('/employees/dashboard');
+      expect(res.status).toBe(200);
+      expect(res.body.totalEmployees).toBeGreaterThanOrEqual(5);
     });
   });
 

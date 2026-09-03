@@ -28,6 +28,12 @@ const sampleEmployees = [
     managerId: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
+    dateOfBirth: null,
+    gender: null,
+    employmentType: null,
+    grade: null,
+    branch: null,
+    exitDate: null,
   },
 ];
 
@@ -65,6 +71,10 @@ describe('EmployeesListPage', () => {
     expect(screen.queryByRole('button', { name: 'New employee' })).not.toBeInTheDocument();
   });
 
+  // This form has more fields (and thus more async Select open/close
+  // cycles) than any other create form in the suite — comfortably under
+  // 15s alone, but the default 20s can be tight under full-suite CPU
+  // contention (see vite.config.ts's testTimeout comment).
   it('creates an employee and refreshes the list', async () => {
     const user = userEvent.setup();
     vi.mocked(hrApi.createEmployee).mockResolvedValue({ ...sampleEmployees[0], id: 'emp-2', employeeNumber: 'EMP-002' });
@@ -80,6 +90,14 @@ describe('EmployeesListPage', () => {
     await user.type(screen.getByLabelText('Employee number', { exact: false }), 'EMP-002');
     await user.type(screen.getByLabelText('Job title', { exact: false }), 'Site Supervisor');
     await user.type(screen.getByLabelText('Hire date', { exact: false }), '2026-01-01');
+    await user.type(screen.getByLabelText('Date of birth', { exact: false }), '1990-01-01');
+    await user.click(screen.getByRole('combobox', { name: 'Gender' }));
+    await user.click(await screen.findByText('Female'));
+    await user.click(screen.getByRole('combobox', { name: 'Employment type' }));
+    await user.click(await screen.findByText('Full-time'));
+    await user.click(screen.getByRole('combobox', { name: 'Grade' }));
+    await user.click(await screen.findByText('Senior'));
+    await user.type(screen.getByLabelText('Branch', { exact: false }), 'Lagos HQ');
     await user.click(screen.getByRole('button', { name: 'Create' }));
 
     await waitFor(() => {
@@ -88,8 +106,12 @@ describe('EmployeesListPage', () => {
         userId: 'user-2',
         employeeNumber: 'EMP-002',
         jobTitle: 'Site Supervisor',
+        gender: 'FEMALE',
+        employmentType: 'FULL_TIME',
+        grade: 'SENIOR',
+        branch: 'Lagos HQ',
       });
     });
     expect(await screen.findByText('Employee created')).toBeInTheDocument();
-  });
+  }, 30000);
 });

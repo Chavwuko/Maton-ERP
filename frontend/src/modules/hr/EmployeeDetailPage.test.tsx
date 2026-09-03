@@ -24,6 +24,12 @@ const baseEmployee: Employee = {
   managerId: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
+  dateOfBirth: null,
+  gender: null,
+  employmentType: null,
+  grade: null,
+  branch: null,
+  exitDate: null,
   directReports: [],
 };
 
@@ -86,5 +92,41 @@ describe('EmployeeDetailPage', () => {
 
     expect(screen.queryByRole('button', { name: /ACTIVE/i })).not.toBeInTheDocument();
     expect(screen.getByText('ACTIVE')).toBeInTheDocument();
+  });
+
+  it('hides "Edit profile" for a non-manager role', async () => {
+    setCurrentRole('finance');
+    vi.mocked(hrApi.getEmployee).mockResolvedValue(baseEmployee);
+
+    renderWithProviders(<EmployeeDetailPage />);
+    await screen.findByText('EMP-001 — Operations Manager');
+
+    expect(screen.queryByRole('button', { name: 'Edit profile' })).not.toBeInTheDocument();
+  });
+
+  it('"Edit profile" pre-fills the form and submits the updated branch', async () => {
+    const user = userEvent.setup();
+    vi.mocked(hrApi.getEmployee).mockResolvedValue({ ...baseEmployee, branch: 'Lagos HQ' });
+    vi.mocked(hrApi.listEmployees).mockResolvedValue([]);
+    vi.mocked(hrApi.updateEmployee).mockResolvedValue({ ...baseEmployee, branch: 'Abuja Office' });
+
+    renderWithProviders(<EmployeeDetailPage />);
+    await screen.findByText('EMP-001 — Operations Manager');
+
+    await user.click(screen.getByRole('button', { name: 'Edit profile' }));
+    const branchInput = await screen.findByLabelText('Branch', { exact: false });
+    expect(branchInput).toHaveValue('Lagos HQ');
+
+    await user.clear(branchInput);
+    await user.type(branchInput, 'Abuja Office');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(hrApi.updateEmployee).toHaveBeenCalledWith(
+        'emp-1',
+        expect.objectContaining({ branch: 'Abuja Office', jobTitle: 'Operations Manager' }),
+      );
+    });
+    expect(await screen.findByText('Employee profile updated')).toBeInTheDocument();
   });
 });

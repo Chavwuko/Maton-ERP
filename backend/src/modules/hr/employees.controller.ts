@@ -16,15 +16,16 @@ import { Request } from 'express';
 import { Roles } from '../../auth/roles.guard';
 import { DocumentControlService } from '../document-control/document-control.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
+import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { UpdateEmploymentStatusDto } from './dto/update-employment-status.dto';
 import { UploadEmployeeDocumentDto } from './dto/upload-employee-document.dto';
 import { EmployeesService } from './employees.service';
 
 // Reads are open to any authenticated user (an org directory); creating an
 // employee record or changing employment status is restricted to
-// admin/hr. The /me routes are the self-service surface every employee
-// uses directly — note they're declared before the /:id routes below so
-// Express matches "me" as a literal segment rather than the :id param.
+// admin/hr. The /me and /dashboard routes are declared before the /:id
+// routes below so Express matches them as literal segments rather than
+// the :id param.
 @Controller('employees')
 export class EmployeesController {
   constructor(
@@ -73,6 +74,11 @@ export class EmployeesController {
     return this.employeesService.findAll({ organizationId, employmentStatus, managerId });
   }
 
+  @Get('dashboard')
+  getDashboard(@Query('organizationId') organizationId?: string) {
+    return this.employeesService.getDashboard({ organizationId });
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.employeesService.findOne(id);
@@ -94,5 +100,11 @@ export class EmployeesController {
   @Patch(':id/status')
   updateStatus(@Param('id') id: string, @Body() dto: UpdateEmploymentStatusDto) {
     return this.employeesService.updateEmploymentStatus(id, dto);
+  }
+
+  @Roles('admin', 'hr')
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateEmployeeDto) {
+    return this.employeesService.update(id, dto);
   }
 }

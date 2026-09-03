@@ -19,6 +19,8 @@ describe('EmployeesController', () => {
       findByUserId: jest.fn(),
       create: jest.fn(),
       updateEmploymentStatus: jest.fn(),
+      update: jest.fn(),
+      getDashboard: jest.fn(),
     } as unknown as jest.Mocked<EmployeesService>;
     documentControlService = {
       findAll: jest.fn(),
@@ -100,5 +102,15 @@ describe('EmployeesController', () => {
   it('updateStatus forwards the id and dto', () => {
     controller.updateStatus('emp-1', { employmentStatus: 'ON_LEAVE' });
     expect(employeesService.updateEmploymentStatus).toHaveBeenCalledWith('emp-1', { employmentStatus: 'ON_LEAVE' });
+  });
+
+  it('update forwards the id and dto', () => {
+    controller.update('emp-1', { jobTitle: 'Site Supervisor' });
+    expect(employeesService.update).toHaveBeenCalledWith('emp-1', { jobTitle: 'Site Supervisor' });
+  });
+
+  it('getDashboard forwards the organizationId filter', () => {
+    controller.getDashboard('org-1');
+    expect(employeesService.getDashboard).toHaveBeenCalledWith({ organizationId: 'org-1' });
   });
 });

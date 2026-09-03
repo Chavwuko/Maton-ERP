@@ -343,21 +343,45 @@ Employee records with self-service document submission, and 360-degree
 appraisals.
 
 **Employees** — reads are open to any authenticated user (an org
-directory); creating a record or changing employment status is restricted
-to `admin`/`hr`.
+directory); creating a record, editing its profile fields, or changing
+employment status is restricted to `admin`/`hr`.
 
 - `POST /employees` (body: `organizationId`, `userId`, `employeeNumber`,
-  `jobTitle`, `hireDate`, `managerId?`) — `userId` must not already have an
-  employee record, `employeeNumber` must be unique within the organization
-  (409 either way, with a distinct message so the client knows which).
+  `jobTitle`, `hireDate`, `managerId?`, `dateOfBirth?`, `gender?`,
+  `employmentType?`, `grade?`, `branch?`) — `userId` must not already have
+  an employee record, `employeeNumber` must be unique within the
+  organization (409 either way, with a distinct message so the client
+  knows which). The profile fields (added for the HR dashboard, see below)
+  are nullable at the DB level since they didn't exist for employees
+  created before this — the frontend's "New employee" form requires them,
+  `PATCH /employees/:id` backfills them for anyone created before that.
 - `GET /employees` (query: `organizationId?`, `employmentStatus?`,
   `managerId?`) — list.
 - `GET /employees/:id` — detail with manager and direct reports.
-- `PATCH /employees/:id/status` (body: `{ employmentStatus }`) —
+- `PATCH /employees/:id` (body: `jobTitle?`, `managerId?`, `dateOfBirth?`,
+  `gender?`, `employmentType?`, `grade?`, `branch?`) — profile edits only;
+  employment status/exit date go through the status endpoint below instead.
+- `PATCH /employees/:id/status` (body: `{ employmentStatus, exitDate? }`) —
   `ACTIVE`/`ON_LEAVE` are freely interchangeable; `TERMINATED` is terminal
   (400 on any further change — rehire by creating a new employee record).
+  Moving to `TERMINATED` stamps `exitDate` (defaults to today if omitted) —
+  the HR dashboard's "Exits"/"Relieving" counts are both just this one date
+  viewed at two different granularities (year vs. quarter).
 - `GET /employees/:id/documents` — restricted to `admin`/`hr` (an
   employee's HR documents can be sensitive).
+- `GET /employees/dashboard` (query: `organizationId?`) — aggregate counts
+  and breakdowns for the HR dashboard (frontend: `HRDashboardPage`, the
+  landing page `/hr` now routes to — the employee list moved to
+  `/hr/employees`): total/new-hires/exits/relieving/joining counts, plus a
+  `{ label, count }[]` breakdown by age range, gender, employment type,
+  grade, branch, designation (`jobTitle`), and department (via the
+  employee's `User.department`). Fixed-category breakdowns (gender,
+  employment type, grade, age range) always include every possible label
+  at `count: 0` rather than omitting empty categories, so a pie/bar chart
+  never silently drops a slice. Computed in-process from `findMany` rather
+  than SQL `GROUP BY` — simplest option at this app's scale, and keeps the
+  bucketing logic (age ranges, "Unknown" fallbacks) in one place in
+  TypeScript rather than split across the query and the response mapping.
 
 **Self-service** — every employee's own surface, resolved from the calling
 user's own `Employee` record (404 if they don't have one). No `@Roles(...)`
@@ -525,6 +549,19 @@ each module's `ALLOWED_TRANSITIONS` map actually permits. Forms that need to
 assign a user (work order assignment, corrective-action assignee, document
 reviewers, employee `userId`) use the `UserSelect`/`UserMultiSelect` pickers
 (`src/components/`), backed by the read-only `GET /users` directory.
+
+**Department dashboards**: HR is the first (`src/modules/hr/HRDashboardPage.tsx`,
+now what `/hr` routes to — the employee list moved to `/hr/employees`) and
+sets the pattern later departments should follow: `StatCard`,
+`BucketPieChart`, and `BucketBarChart` (`src/components/`) are generic over
+a `{ label, count }[]` bucket shape, so a new department's dashboard is
+just a new page composing them against its own aggregate endpoint, not new
+chart-wiring code. Charts are `@mantine/charts` (a thin Recharts wrapper
+that inherits the Mantine theme for free). `AppNav` supports nested
+children for exactly this shape — HR's entry expands into Dashboard,
+Employees, and four disabled "Coming soon" placeholders (Shift &
+Attendance, Expense Requests, Performance, Leaves) for sub-modules not
+built yet.
 
 **Auth**: `src/auth/authMode.ts` mirrors the backend's `AUTH_MODE` switch via
 `VITE_AUTH_MODE` (default `local`, matching `AUTH_MODE=local`). `local` keeps

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Anchor, Button, Group, Loader, Modal, Stack, Table, TextInput, Title } from '@mantine/core';
+import { Alert, Anchor, Button, Group, Loader, Modal, Select, Stack, Table, TextInput, Title } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { createEmployee, listEmployees } from '../../api/hr';
@@ -12,7 +12,19 @@ import { UserSelect } from '../../components/UserSelect';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useRole } from '../../auth/RoleContext';
 import { hasRole } from '../../auth/roleStore';
-import { EMPLOYMENT_STATUS_COLORS } from './types';
+import {
+  EMPLOYEE_GRADE_LABELS,
+  EMPLOYMENT_STATUS_COLORS,
+  EMPLOYMENT_TYPE_LABELS,
+  GENDER_LABELS,
+  type EmployeeGrade,
+  type EmploymentType,
+  type Gender,
+} from './types';
+
+const GENDER_OPTIONS = Object.entries(GENDER_LABELS).map(([value, label]) => ({ value, label }));
+const EMPLOYMENT_TYPE_OPTIONS = Object.entries(EMPLOYMENT_TYPE_LABELS).map(([value, label]) => ({ value, label }));
+const EMPLOYEE_GRADE_OPTIONS = Object.entries(EMPLOYEE_GRADE_LABELS).map(([value, label]) => ({ value, label }));
 
 export function EmployeesListPage() {
   const { role } = useRole();
@@ -27,13 +39,30 @@ export function EmployeesListPage() {
   } = useQuery({ queryKey: ['employees'], queryFn: () => listEmployees() });
 
   const form = useForm({
-    initialValues: { organizationId: '', userId: '', employeeNumber: '', jobTitle: '', hireDate: '', managerId: '' },
+    initialValues: {
+      organizationId: '',
+      userId: '',
+      employeeNumber: '',
+      jobTitle: '',
+      hireDate: '',
+      managerId: '',
+      dateOfBirth: '',
+      gender: '',
+      employmentType: '',
+      grade: '',
+      branch: '',
+    },
     validate: {
       organizationId: (value) => (value ? null : 'Organization is required'),
       userId: (value) => (value ? null : 'User is required'),
       employeeNumber: (value) => (value.trim() ? null : 'Employee number is required'),
       jobTitle: (value) => (value.trim() ? null : 'Job title is required'),
       hireDate: (value) => (value ? null : 'Hire date is required'),
+      dateOfBirth: (value) => (value ? null : 'Date of birth is required'),
+      gender: (value) => (value ? null : 'Gender is required'),
+      employmentType: (value) => (value ? null : 'Employment type is required'),
+      grade: (value) => (value ? null : 'Grade is required'),
+      branch: (value) => (value.trim() ? null : 'Branch is required'),
     },
   });
 
@@ -42,7 +71,11 @@ export function EmployeesListPage() {
       createEmployee({
         ...values,
         hireDate: new Date(values.hireDate).toISOString(),
+        dateOfBirth: new Date(values.dateOfBirth).toISOString(),
         managerId: values.managerId || undefined,
+        gender: values.gender as Gender,
+        employmentType: values.employmentType as EmploymentType,
+        grade: values.grade as EmployeeGrade,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
@@ -115,6 +148,11 @@ export function EmployeesListPage() {
             <TextInput label="Employee number" placeholder="EMP-001" required {...form.getInputProps('employeeNumber')} />
             <TextInput label="Job title" required {...form.getInputProps('jobTitle')} />
             <TextInput type="date" label="Hire date" required {...form.getInputProps('hireDate')} />
+            <TextInput type="date" label="Date of birth" required {...form.getInputProps('dateOfBirth')} />
+            <Select label="Gender" data={GENDER_OPTIONS} required {...form.getInputProps('gender')} />
+            <Select label="Employment type" data={EMPLOYMENT_TYPE_OPTIONS} required {...form.getInputProps('employmentType')} />
+            <Select label="Grade" data={EMPLOYEE_GRADE_OPTIONS} required {...form.getInputProps('grade')} />
+            <TextInput label="Branch" placeholder="Lagos HQ" required {...form.getInputProps('branch')} />
             <EmployeeSelect label="Manager" {...form.getInputProps('managerId')} />
             <Group justify="flex-end">
               <Button type="submit" loading={createMutation.isPending}>

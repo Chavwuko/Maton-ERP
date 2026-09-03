@@ -23,6 +23,7 @@ import { AppraisalCyclesListPage } from './modules/hr/AppraisalCyclesListPage';
 import { AppraisalDetailPage } from './modules/hr/AppraisalDetailPage';
 import { EmployeeDetailPage } from './modules/hr/EmployeeDetailPage';
 import { EmployeesListPage } from './modules/hr/EmployeesListPage';
+import { HRDashboardPage } from './modules/hr/HRDashboardPage';
 import { DocumentDetailPage } from './modules/document-control/DocumentDetailPage';
 import { DocumentsListPage } from './modules/document-control/DocumentsListPage';
 import { UsersListPage } from './modules/users/UsersListPage';
@@ -50,7 +51,8 @@ export default function App() {
         <Route path="/inventory/items/:id" element={<InventoryItemDetailPage />} />
         <Route path="/inventory/warehouses" element={<WarehousesListPage />} />
         <Route path="/inventory/warehouses/:id" element={<WarehouseDetailPage />} />
-        <Route path="/hr" element={<EmployeesListPage />} />
+        <Route path="/hr" element={<HRDashboardPage />} />
+        <Route path="/hr/employees" element={<EmployeesListPage />} />
         <Route path="/hr/employees/:id" element={<EmployeeDetailPage />} />
         <Route path="/hr/appraisal-cycles" element={<AppraisalCyclesListPage />} />
         <Route path="/hr/appraisal-cycles/:id" element={<AppraisalCycleDetailPage />} />

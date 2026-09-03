@@ -6,7 +6,11 @@ import type {
   AppraisalRelationType,
   AppraisalStatus,
   Employee,
+  EmployeeGrade,
   EmploymentStatus,
+  EmploymentType,
+  Gender,
+  HrDashboard,
 } from '../modules/hr/types';
 
 export function listEmployees(filters: { organizationId?: string; employmentStatus?: EmploymentStatus; managerId?: string } = {}) {
@@ -33,12 +37,37 @@ export function createEmployee(data: {
   jobTitle: string;
   hireDate: string;
   managerId?: string;
+  dateOfBirth?: string;
+  gender?: Gender;
+  employmentType?: EmploymentType;
+  grade?: EmployeeGrade;
+  branch?: string;
 }) {
   return apiClient.post<Employee>('/employees', data);
 }
 
-export function updateEmploymentStatus(id: string, employmentStatus: EmploymentStatus) {
-  return apiClient.patch<Employee>(`/employees/${id}/status`, { employmentStatus });
+export function updateEmployee(
+  id: string,
+  data: {
+    jobTitle?: string;
+    managerId?: string;
+    dateOfBirth?: string;
+    gender?: Gender;
+    employmentType?: EmploymentType;
+    grade?: EmployeeGrade;
+    branch?: string;
+  },
+) {
+  return apiClient.patch<Employee>(`/employees/${id}`, data);
+}
+
+export function updateEmploymentStatus(id: string, employmentStatus: EmploymentStatus, exitDate?: string) {
+  return apiClient.patch<Employee>(`/employees/${id}/status`, { employmentStatus, exitDate });
+}
+
+export function getHrDashboard(organizationId?: string) {
+  const qs = organizationId ? `?organizationId=${organizationId}` : '';
+  return apiClient.get<HrDashboard>(`/employees/dashboard${qs}`);
 }
 
 export function listAppraisalCycles(filters: { organizationId?: string; status?: AppraisalCycleStatus } = {}) {

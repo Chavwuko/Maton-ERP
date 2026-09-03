@@ -57,7 +57,7 @@ export function AppraisalCyclesListPage() {
       <Group justify="space-between">
         <div>
           <Title order={2}>Appraisal Cycles</Title>
-          <Anchor component={Link} to="/hr" size="sm">
+          <Anchor component={Link} to="/hr/employees" size="sm">
             ← Employees
           </Anchor>
         </div>
