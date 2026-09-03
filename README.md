@@ -825,3 +825,22 @@ under `AUTH_MODE=local`). `infra/` has never actually been `terraform
 apply`'d (see "Local development against the real AWS infra" — no AWS
 account backs this project yet), so the real authorize → callback → token
 exchange round-trip against Cognito itself has not been exercised live.
+
+## Roadmap
+
+Standing list of planned work — not yet started unless noted otherwise.
+
+- **HR sub-modules**: Shift & Attendance, Expense Requests, Performance,
+  Leaves. Placeholder "Coming soon" entries already exist in `AppNav`
+  (nested under HR). On hold until the workflow for these is provided.
+- **Department dashboards beyond HR**: the `StatCard`/`BucketPieChart`/
+  `BucketBarChart` pattern (see "Department dashboards" under Frontend) is
+  proven out on HR; every other department (Maintenance, Accounting,
+  Inventory, HSE, Document Control, Project Control, Assets) still only has
+  list/detail pages. On hold until the HR sub-modules above are done.
+- **Frontend theme redesign** to match brand style (colors, typography,
+  spacing — currently default Mantine theme).
+- **Logo and site favicon** — not yet implemented anywhere in the SPA.
+- **HR dashboard visual redesign** to match a specific sketched layout the
+  user will provide (current `HRDashboardPage` layout — stat card row +
+  chart grid — is a first pass, not the intended final design).
