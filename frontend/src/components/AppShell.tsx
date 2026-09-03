@@ -1,4 +1,4 @@
-import { AppShell as MantineAppShell, Group, Title } from '@mantine/core';
+import { AppShell as MantineAppShell, Group, ScrollArea, Title } from '@mantine/core';
 import type { ReactNode } from 'react';
 import { getAuthMode } from '../auth/authMode';
 import { AppNav } from './AppNav';
@@ -15,8 +15,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Group>
       </MantineAppShell.Header>
 
-      <MantineAppShell.Navbar p="md">
-        <AppNav />
+      <MantineAppShell.Navbar p={0}>
+        {/* A module with sub-items (e.g. HR) expands in place and can push
+            later modules below the navbar's fixed height — scroll instead
+            of clipping them. */}
+        <MantineAppShell.Section grow component={ScrollArea} p="md">
+          <AppNav />
+        </MantineAppShell.Section>
       </MantineAppShell.Navbar>
 
       <MantineAppShell.Main>{children}</MantineAppShell.Main>
