@@ -34,6 +34,7 @@ const sampleEmployees = [
     grade: null,
     branch: null,
     exitDate: null,
+    shiftId: null,
   },
 ];
 

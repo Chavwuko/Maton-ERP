@@ -428,6 +428,39 @@ any count ≥ 1).
   approvals, Accounting's payments, HSE's corrective actions). Before that,
   it's `IN_PROGRESS` once at least one review is in.
 
+**Shift & Attendance** — the first HR sub-module (see the frontend's
+`/hr/shift-attendance`, a tabbed page: "My Attendance" for everyone,
+"Shifts" and "Team Attendance" for `admin`/`hr`). A `Shift` is a named
+schedule template (`startTime`/`endTime` as `"HH:mm"`, `breakMinutes`); an
+`Employee` has at most one current assignment (`Employee.shiftId`, set via
+the existing `PATCH /employees/:id`) rather than a shift-change history
+table — simplest thing that works for "who's on which shift right now".
+`AttendanceRecord` is one row per employee per calendar day.
+
+- `POST /shifts` (body: `organizationId`, `name`, `startTime`, `endTime`,
+  `breakMinutes?`) — restricted to `admin`/`hr`. 409 on a duplicate `name`
+  within the organization.
+- `GET /shifts` (query: `organizationId?`), `GET /shifts/:id` — open to any
+  authenticated user (needed for the shift picker on the employee edit
+  form).
+- `PATCH /shifts/:id` — restricted to `admin`/`hr`.
+- `POST /attendance/clock-in`, `POST /attendance/clock-out` — self-service,
+  resolved from the caller's own `Employee` record like `/employees/me`.
+  Clocking in more than 10 minutes after the assigned shift's `startTime`
+  sets `status: "LATE"` instead of `"PRESENT"` (no shift assigned always
+  means `"PRESENT"` — there's nothing to be late against). 409 on a second
+  clock-in/out for the same day; 400 clocking out before ever clocking in.
+- `GET /attendance/me` (query: `from?`, `to?`) — my own history.
+- `GET /attendance` (query: `employeeId?`, `from?`, `to?`, `status?`) —
+  restricted to `admin`/`hr`; every record's `employee` is included.
+- `POST /attendance` (body: `employeeId`, `date`, `status`, `clockIn?`,
+  `clockOut?`, `notes?`) — restricted to `admin`/`hr`. For days that never
+  see a self clock-in (`ABSENT`/`ON_LEAVE`/`HOLIDAY`/`HALF_DAY`) or
+  backdated corrections. 409 if a record for that employee/day already
+  exists.
+- `PATCH /attendance/:id` (body: `status?`, `clockIn?`, `clockOut?`,
+  `notes?`) — restricted to `admin`/`hr`; corrects an existing record.
+
 ## Users directory
 
 A read-only directory over the `User` table — there's no create/update here:
@@ -830,9 +863,10 @@ exchange round-trip against Cognito itself has not been exercised live.
 
 Standing list of planned work — not yet started unless noted otherwise.
 
-- **HR sub-modules**: Shift & Attendance, Expense Requests, Performance,
-  Leaves. Placeholder "Coming soon" entries already exist in `AppNav`
-  (nested under HR). On hold until the workflow for these is provided.
+- **HR sub-modules**: Shift & Attendance is now built (see "Shift &
+  Attendance" under the HR module section above). Expense Requests,
+  Performance, Leaves remain placeholder "Coming soon" entries in `AppNav`
+  (nested under HR) — on hold until the workflow for each is provided.
 - **Department dashboards beyond HR**: the `StatCard`/`BucketPieChart`/
   `BucketBarChart` pattern (see "Department dashboards" under Frontend) is
   proven out on HR; every other department (Maintenance, Accounting,

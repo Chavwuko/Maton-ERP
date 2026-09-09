@@ -244,6 +244,17 @@ describe('EmployeesService', () => {
         expect.objectContaining({ data: expect.objectContaining({ dateOfBirth: undefined }) }),
       );
     });
+
+    it('updates the shift assignment when shiftId is given', async () => {
+      prisma.employee.findUnique.mockResolvedValue({ id: 'emp-1' } as never);
+      prisma.employee.update.mockResolvedValue({ id: 'emp-1', shiftId: 'shift-1' } as never);
+
+      await service.update('emp-1', { shiftId: 'shift-1' });
+
+      expect(prisma.employee.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ shiftId: 'shift-1' }) }),
+      );
+    });
   });
 
   describe('getDashboard', () => {

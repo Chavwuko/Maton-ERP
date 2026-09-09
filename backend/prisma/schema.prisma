@@ -33,6 +33,7 @@ model Organization {
   employees        Employee[]
   appraisalCycles  AppraisalCycle[]
   appraisals       Appraisal[]
+  shifts           Shift[]
 
   @@map("organizations")
 }
@@ -686,15 +687,20 @@ model Employee {
   // (This Quarter)" on the HR dashboard; set via PATCH when an employee's
   // status moves to TERMINATED.
   exitDate       DateTime?
+  // Shift & Attendance sub-module — current shift assignment. Nullable:
+  // most employees start unassigned until HR sets one via PATCH.
+  shiftId        String?
 
   organization Organization @relation(fields: [organizationId], references: [id])
   user         User         @relation(fields: [userId], references: [id])
   manager      Employee?    @relation("EmployeeManager", fields: [managerId], references: [id])
   directReports Employee[]  @relation("EmployeeManager")
+  shift        Shift?       @relation(fields: [shiftId], references: [id])
 
   documents          Document[]
   appraisalsAsSubject Appraisal[]        @relation("AppraisalSubject")
   appraisalReviews    AppraisalReviewer[] @relation("AppraisalReviewerEmployee")
+  attendanceRecords    AttendanceRecord[]
 
   @@unique([organizationId, employeeNumber])
   @@map("employees")
@@ -808,4 +814,62 @@ enum AppraisalRelationType {
 enum AppraisalReviewStatus {
   PENDING
   SUBMITTED
+}
+
+// ---------------------------------------------------------------------------
+// HR: Shift & Attendance. A Shift is a named work schedule template
+// (start/end time, break); an employee has at most one current assignment
+// (Employee.shiftId) rather than a history table — simplest thing that
+// works for "who's on which shift right now", extend later if shift-change
+// history is ever needed. AttendanceRecord is one row per employee per
+// calendar day: self clock-in/out sets PRESENT/LATE automatically (see
+// AttendanceService), admin/hr can create/correct any row directly for
+// ABSENT/ON_LEAVE/HOLIDAY/HALF_DAY days that never see a clock-in.
+// ---------------------------------------------------------------------------
+
+model Shift {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  // 24h "HH:mm", e.g. "09:00" — no timezone handling, matches this app's
+  // single-timezone-per-deployment scope elsewhere.
+  startTime      String
+  endTime        String
+  breakMinutes   Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  employees    Employee[]
+
+  @@unique([organizationId, name])
+  @@map("shifts")
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  HALF_DAY
+  ABSENT
+  ON_LEAVE
+  HOLIDAY
+}
+
+model AttendanceRecord {
+  id         String           @id @default(uuid())
+  employeeId String
+  // Stored at UTC midnight for the calendar day it represents — always
+  // compared/queried by day, never by time-of-day.
+  date       DateTime
+  clockIn    DateTime?
+  clockOut   DateTime?
+  status     AttendanceStatus @default(PRESENT)
+  notes      String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, date])
+  @@map("attendance_records")
 }

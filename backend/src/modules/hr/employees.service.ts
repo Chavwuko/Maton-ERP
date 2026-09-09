@@ -61,7 +61,7 @@ export class EmployeesService {
   async findOne(id: string) {
     const employee = await this.prisma.employee.findUnique({
       where: { id },
-      include: { manager: true, directReports: true },
+      include: { manager: true, directReports: true, shift: true },
     });
     if (!employee) {
       throw new NotFoundException(`Employee ${id} not found`);
@@ -137,6 +137,7 @@ export class EmployeesService {
         employmentType: dto.employmentType,
         grade: dto.grade,
         branch: dto.branch,
+        shiftId: dto.shiftId,
       },
     });
   }

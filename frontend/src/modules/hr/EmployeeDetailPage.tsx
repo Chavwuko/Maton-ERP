@@ -9,6 +9,7 @@ import { getEmployee, updateEmployee, updateEmploymentStatus } from '../../api/h
 import { useRole } from '../../auth/RoleContext';
 import { hasRole } from '../../auth/roleStore';
 import { EmployeeSelect } from '../../components/EmployeeSelect';
+import { ShiftSelect } from '../../components/ShiftSelect';
 import { StatusMenu } from '../../components/StatusMenu';
 import {
   EMPLOYEE_GRADE_LABELS,
@@ -65,6 +66,7 @@ export function EmployeeDetailPage() {
       employmentType: employee?.employmentType ?? '',
       grade: employee?.grade ?? '',
       branch: employee?.branch ?? '',
+      shiftId: employee?.shiftId ?? '',
     },
   });
 
@@ -77,6 +79,7 @@ export function EmployeeDetailPage() {
         gender: (values.gender || undefined) as Gender | undefined,
         employmentType: (values.employmentType || undefined) as EmploymentType | undefined,
         grade: (values.grade || undefined) as EmployeeGrade | undefined,
+        shiftId: values.shiftId || undefined,
       }),
     onSuccess: () => {
       invalidate();
@@ -123,6 +126,7 @@ export function EmployeeDetailPage() {
                   employmentType: employee.employmentType ?? '',
                   grade: employee.grade ?? '',
                   branch: employee.branch ?? '',
+                  shiftId: employee.shiftId ?? '',
                 });
                 setEditOpen(true);
               }}
@@ -174,6 +178,10 @@ export function EmployeeDetailPage() {
             <Table.Td>{employee.branch ?? '—'}</Table.Td>
           </Table.Tr>
           <Table.Tr>
+            <Table.Th>Shift</Table.Th>
+            <Table.Td>{employee.shift ? `${employee.shift.name} (${employee.shift.startTime}–${employee.shift.endTime})` : '—'}</Table.Td>
+          </Table.Tr>
+          <Table.Tr>
             <Table.Th>Manager</Table.Th>
             <Table.Td>
               {employee.manager ? (
@@ -217,6 +225,7 @@ export function EmployeeDetailPage() {
             />
             <Select label="Grade" data={EMPLOYEE_GRADE_OPTIONS} clearable {...editForm.getInputProps('grade')} />
             <TextInput label="Branch" placeholder="Lagos HQ" {...editForm.getInputProps('branch')} />
+            <ShiftSelect {...editForm.getInputProps('shiftId')} />
             <EmployeeSelect label="Manager" {...editForm.getInputProps('managerId')} />
             <Group justify="flex-end">
               <Button type="submit" loading={editMutation.isPending}>

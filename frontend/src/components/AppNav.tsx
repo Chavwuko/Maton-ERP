@@ -13,8 +13,9 @@ interface NavItem {
 
 // Mirrors the backend's module build order (see README's "Notes on
 // scope"). HR is the first module built out with its own dashboard +
-// sub-modules — Shift & Attendance/Expense Requests/Performance/Leaves are
-// listed as a visible roadmap and get flipped to `path` as each lands.
+// sub-modules — Expense Requests/Performance/Leaves are listed as a visible
+// roadmap and get flipped to `path` as each lands (Shift & Attendance
+// already has).
 const NAV_ITEMS: NavItem[] = [
   { label: 'Organizations', path: '/organizations' },
   { label: 'Document Control', path: '/documents' },
@@ -30,7 +31,7 @@ const NAV_ITEMS: NavItem[] = [
     children: [
       { label: 'Dashboard', path: '/hr', exact: true },
       { label: 'Employees', path: '/hr/employees' },
-      { label: 'Shift & Attendance' },
+      { label: 'Shift & Attendance', path: '/hr/shift-attendance' },
       { label: 'Expense Requests' },
       { label: 'Performance' },
       { label: 'Leaves' },

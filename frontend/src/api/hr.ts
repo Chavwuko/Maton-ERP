@@ -5,12 +5,15 @@ import type {
   AppraisalCycleStatus,
   AppraisalRelationType,
   AppraisalStatus,
+  AttendanceRecord,
+  AttendanceStatus,
   Employee,
   EmployeeGrade,
   EmploymentStatus,
   EmploymentType,
   Gender,
   HrDashboard,
+  Shift,
 } from '../modules/hr/types';
 
 export function listEmployees(filters: { organizationId?: string; employmentStatus?: EmploymentStatus; managerId?: string } = {}) {
@@ -56,6 +59,7 @@ export function updateEmployee(
     employmentType?: EmploymentType;
     grade?: EmployeeGrade;
     branch?: string;
+    shiftId?: string;
   },
 ) {
   return apiClient.patch<Employee>(`/employees/${id}`, data);
@@ -114,4 +118,67 @@ export function getAppraisal(id: string) {
 
 export function submitAppraisalReview(id: string, data: { rating: number; comments?: string }) {
   return apiClient.post<Appraisal>(`/appraisals/${id}/reviews`, data);
+}
+
+// --- Shifts ---
+
+export function listShifts(organizationId?: string) {
+  const qs = organizationId ? `?organizationId=${organizationId}` : '';
+  return apiClient.get<Shift[]>(`/shifts${qs}`);
+}
+
+export function createShift(data: { organizationId: string; name: string; startTime: string; endTime: string; breakMinutes?: number }) {
+  return apiClient.post<Shift>('/shifts', data);
+}
+
+export function updateShift(id: string, data: { name?: string; startTime?: string; endTime?: string; breakMinutes?: number }) {
+  return apiClient.patch<Shift>(`/shifts/${id}`, data);
+}
+
+// --- Attendance ---
+
+export function clockIn() {
+  return apiClient.post<AttendanceRecord>('/attendance/clock-in', {});
+}
+
+export function clockOut() {
+  return apiClient.post<AttendanceRecord>('/attendance/clock-out', {});
+}
+
+export function getMyAttendance(filters: { from?: string; to?: string } = {}) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+  const qs = params.toString();
+  return apiClient.get<AttendanceRecord[]>(`/attendance/me${qs ? `?${qs}` : ''}`);
+}
+
+export function listAttendance(
+  filters: { employeeId?: string; from?: string; to?: string; status?: AttendanceStatus } = {},
+) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+  const qs = params.toString();
+  return apiClient.get<AttendanceRecord[]>(`/attendance${qs ? `?${qs}` : ''}`);
+}
+
+export function createAttendanceRecord(data: {
+  employeeId: string;
+  date: string;
+  status: AttendanceStatus;
+  clockIn?: string;
+  clockOut?: string;
+  notes?: string;
+}) {
+  return apiClient.post<AttendanceRecord>('/attendance', data);
+}
+
+export function updateAttendanceRecord(
+  id: string,
+  data: { status?: AttendanceStatus; clockIn?: string; clockOut?: string; notes?: string },
+) {
+  return apiClient.patch<AttendanceRecord>(`/attendance/${id}`, data);
 }

@@ -30,6 +30,7 @@ const baseEmployee: Employee = {
   grade: null,
   branch: null,
   exitDate: null,
+  shiftId: null,
   directReports: [],
 };
 

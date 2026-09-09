@@ -24,8 +24,10 @@ export interface Employee {
   grade: EmployeeGrade | null;
   branch: string | null;
   exitDate: string | null;
+  shiftId: string | null;
   manager?: Employee | null;
   directReports?: Employee[];
+  shift?: Shift | null;
 }
 
 export interface DashboardBucket {
@@ -136,4 +138,41 @@ export const APPRAISAL_STATUS_COLORS: Record<AppraisalStatus, string> = {
   PENDING: 'blue',
   IN_PROGRESS: 'yellow',
   COMPLETED: 'green',
+};
+
+// --- Shift & Attendance ---
+
+export interface Shift {
+  id: string;
+  organizationId: string;
+  name: string;
+  startTime: string; // "HH:mm"
+  endTime: string; // "HH:mm"
+  breakMinutes: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type AttendanceStatus = 'PRESENT' | 'LATE' | 'HALF_DAY' | 'ABSENT' | 'ON_LEAVE' | 'HOLIDAY';
+
+export interface AttendanceRecord {
+  id: string;
+  employeeId: string;
+  date: string;
+  clockIn: string | null;
+  clockOut: string | null;
+  status: AttendanceStatus;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  employee?: Employee;
+}
+
+export const ATTENDANCE_STATUS_COLORS: Record<AttendanceStatus, string> = {
+  PRESENT: 'green',
+  LATE: 'yellow',
+  HALF_DAY: 'orange',
+  ABSENT: 'red',
+  ON_LEAVE: 'blue',
+  HOLIDAY: 'grape',
 };

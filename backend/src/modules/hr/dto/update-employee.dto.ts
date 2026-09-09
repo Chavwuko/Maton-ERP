@@ -11,4 +11,6 @@ export class UpdateEmployeeDto {
   employmentType?: EmploymentType;
   grade?: EmployeeGrade;
   branch?: string;
+  // Shift & Attendance sub-module — current shift assignment.
+  shiftId?: string;
 }
