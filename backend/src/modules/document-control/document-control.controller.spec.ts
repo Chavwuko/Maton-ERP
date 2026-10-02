@@ -24,7 +24,7 @@ describe('DocumentControlController', () => {
   });
 
   it('findAll forwards every filter query param', () => {
-    controller.findAll('org-1', 'DRAFT' as never, 'dept-1', 'proj-1', 'wo-1', 'inv-1', 'inc-1', 'emp-1');
+    controller.findAll('org-1', 'DRAFT' as never, 'dept-1', 'proj-1', 'wo-1', 'inv-1', 'inc-1', 'emp-1', 'exp-1');
     expect(service.findAll).toHaveBeenCalledWith({
       organizationId: 'org-1',
       status: 'DRAFT',
@@ -34,6 +34,7 @@ describe('DocumentControlController', () => {
       invoiceId: 'inv-1',
       incidentId: 'inc-1',
       employeeId: 'emp-1',
+      expenseRequestId: 'exp-1',
     });
   });
 

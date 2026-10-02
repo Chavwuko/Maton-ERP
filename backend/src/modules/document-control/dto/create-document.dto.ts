@@ -7,6 +7,7 @@ export class CreateDocumentDto {
   invoiceId?: string;
   incidentId?: string;
   employeeId?: string;
+  expenseRequestId?: string;
   description?: string;
   category?: string;
 }

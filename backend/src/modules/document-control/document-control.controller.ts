@@ -35,6 +35,7 @@ export class DocumentControlController {
     @Query('invoiceId') invoiceId?: string,
     @Query('incidentId') incidentId?: string,
     @Query('employeeId') employeeId?: string,
+    @Query('expenseRequestId') expenseRequestId?: string,
   ) {
     return this.documentControlService.findAll({
       organizationId,
@@ -45,6 +46,7 @@ export class DocumentControlController {
       invoiceId,
       incidentId,
       employeeId,
+      expenseRequestId,
     });
   }
 

@@ -17,6 +17,7 @@ export interface CreateDocumentFields {
   invoiceId?: string;
   incidentId?: string;
   employeeId?: string;
+  expenseRequestId?: string;
   description?: string;
   category?: string;
 }

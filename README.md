@@ -461,6 +461,32 @@ table — simplest thing that works for "who's on which shift right now".
 - `PATCH /attendance/:id` (body: `status?`, `clockIn?`, `clockOut?`,
   `notes?`) — restricted to `admin`/`hr`; corrects an existing record.
 
+**Expense Requests** — the second HR sub-module (frontend: `/hr/expense-requests`,
+tabbed: "My Requests" for everyone, "Team Requests" for `admin`/`hr`). An
+`ExpenseRequest` is an employee's reimbursement claim — single-level
+approval (`admin`/`hr`) rather than a multi-step chain, the same shape as
+everywhere else in this codebase (Invoice's `DRAFT` → `APPROVED` → `PAID`,
+HSE's corrective actions). Receipts attach via the ordinary `POST
+/documents` (now takes an optional `expenseRequestId`, alongside
+`workOrderId`/`incidentId`/`employeeId`) rather than a bespoke upload route.
+
+- `POST /expense-requests/me` (body: `organizationId`, `category`
+  (`TRAVEL`/`MEALS`/`ACCOMMODATION`/`OFFICE_SUPPLIES`/`TRANSPORT`/`OTHER`),
+  `amount`, `incurredOn`, `description?`) — self-service, resolved from the
+  caller's own `Employee` record like `/employees/me`. Starts `PENDING`.
+  400 on a non-positive `amount`.
+- `GET /expense-requests/me` (query: `status?`) — my own claims.
+- `GET /expense-requests` (query: `organizationId?`, `employeeId?`,
+  `status?`, `category?`), `GET /expense-requests/:id` (detail includes
+  the employee and any attached receipts) — open to any authenticated
+  user, matching Invoices' openness (financial records elsewhere in this
+  codebase are already read-open, mutations are what's gated).
+- `PATCH /expense-requests/:id/status` (body: `status`, `decisionComment?`)
+  — restricted to `admin`/`hr`. `PENDING` → `APPROVED`/`REJECTED`;
+  `APPROVED` → `REIMBURSED` (stamps `reimbursedAt`); `REJECTED`/`REIMBURSED`
+  are terminal. `decidedAt`/`decidedById` are stamped on the
+  approve/reject decision, not on the later reimbursement.
+
 ## Users directory
 
 A read-only directory over the `User` table — there's no create/update here:
@@ -863,10 +889,10 @@ exchange round-trip against Cognito itself has not been exercised live.
 
 Standing list of planned work — not yet started unless noted otherwise.
 
-- **HR sub-modules**: Shift & Attendance is now built (see "Shift &
-  Attendance" under the HR module section above). Expense Requests,
-  Performance, Leaves remain placeholder "Coming soon" entries in `AppNav`
-  (nested under HR) — on hold until the workflow for each is provided.
+- **HR sub-modules**: Shift & Attendance and Expense Requests are now built
+  (see their sections under the HR module section above). Performance,
+  Leaves remain placeholder "Coming soon" entries in `AppNav` (nested under
+  HR) — on hold until the workflow for each is provided.
 - **Department dashboards beyond HR**: the `StatCard`/`BucketPieChart`/
   `BucketBarChart` pattern (see "Department dashboards" under Frontend) is
   proven out on HR; every other department (Maintenance, Accounting,

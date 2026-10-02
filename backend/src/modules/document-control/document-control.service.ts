@@ -37,6 +37,7 @@ export class DocumentControlService {
     invoiceId?: string;
     incidentId?: string;
     employeeId?: string;
+    expenseRequestId?: string;
   }) {
     return this.prisma.document.findMany({
       where: {
@@ -48,6 +49,7 @@ export class DocumentControlService {
         invoiceId: filters.invoiceId,
         incidentId: filters.incidentId,
         employeeId: filters.employeeId,
+        expenseRequestId: filters.expenseRequestId,
       },
       include: { versions: { orderBy: { versionNumber: 'desc' }, take: 1 } },
       orderBy: { updatedAt: 'desc' },
@@ -80,6 +82,7 @@ export class DocumentControlService {
           invoiceId: dto.invoiceId,
           incidentId: dto.incidentId,
           employeeId: dto.employeeId,
+          expenseRequestId: dto.expenseRequestId,
           title: dto.title,
           description: dto.description,
           category: dto.category,

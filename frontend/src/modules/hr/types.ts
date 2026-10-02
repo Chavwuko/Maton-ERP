@@ -176,3 +176,51 @@ export const ATTENDANCE_STATUS_COLORS: Record<AttendanceStatus, string> = {
   ON_LEAVE: 'blue',
   HOLIDAY: 'grape',
 };
+
+// --- Expense Requests ---
+
+export type ExpenseCategory = 'TRAVEL' | 'MEALS' | 'ACCOMMODATION' | 'OFFICE_SUPPLIES' | 'TRANSPORT' | 'OTHER';
+export type ExpenseRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'REIMBURSED';
+
+export interface ExpenseRequest {
+  id: string;
+  organizationId: string;
+  employeeId: string;
+  category: ExpenseCategory;
+  amount: string;
+  description: string | null;
+  incurredOn: string;
+  status: ExpenseRequestStatus;
+  decidedById: string | null;
+  decisionComment: string | null;
+  decidedAt: string | null;
+  reimbursedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  employee?: Employee;
+}
+
+export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
+  TRAVEL: 'Travel',
+  MEALS: 'Meals',
+  ACCOMMODATION: 'Accommodation',
+  OFFICE_SUPPLIES: 'Office supplies',
+  TRANSPORT: 'Transport',
+  OTHER: 'Other',
+};
+
+// REIMBURSED only ever follows APPROVED; REJECTED/REIMBURSED are terminal —
+// same single-level-approval shape as Invoices (DRAFT -> APPROVED -> PAID).
+export const EXPENSE_REQUEST_TRANSITIONS: Record<ExpenseRequestStatus, ExpenseRequestStatus[]> = {
+  PENDING: ['APPROVED', 'REJECTED'],
+  APPROVED: ['REIMBURSED'],
+  REJECTED: [],
+  REIMBURSED: [],
+};
+
+export const EXPENSE_REQUEST_STATUS_COLORS: Record<ExpenseRequestStatus, string> = {
+  PENDING: 'blue',
+  APPROVED: 'green',
+  REJECTED: 'red',
+  REIMBURSED: 'teal',
+};

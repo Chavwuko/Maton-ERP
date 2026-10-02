@@ -34,6 +34,7 @@ model Organization {
   appraisalCycles  AppraisalCycle[]
   appraisals       Appraisal[]
   shifts           Shift[]
+  expenseRequests  ExpenseRequest[]
 
   @@map("organizations")
 }
@@ -84,6 +85,8 @@ model User {
 
   incidentsReported       Incident[]        @relation("IncidentReportedBy")
   correctiveActionsOwned  CorrectiveAction[] @relation("CorrectiveActionAssignee")
+
+  expenseRequestsDecided ExpenseRequest[] @relation("ExpenseRequestDecidedBy")
 
   // One HR record per employed user. Optional because not every
   // Cognito-authenticated User is necessarily an onboarded employee
@@ -255,6 +258,9 @@ model Document {
   // Set when an employee self-submits a personal HR document (ID, cert,
   // signed contract, etc) via POST /employees/me/documents.
   employeeId     String?
+  // A reimbursement claim's receipt(s) — same POST /documents convention as
+  // every other module, no dedicated expense-requests upload route needed.
+  expenseRequestId String?
   title          String
   description    String?
   category       String?
@@ -273,6 +279,7 @@ model Document {
   invoice      Invoice?          @relation(fields: [invoiceId], references: [id])
   incident     Incident?         @relation(fields: [incidentId], references: [id])
   employee     Employee?         @relation(fields: [employeeId], references: [id])
+  expenseRequest ExpenseRequest? @relation(fields: [expenseRequestId], references: [id])
   owner        User              @relation("DocumentOwner", fields: [ownerId], references: [id])
   versions     DocumentVersion[]
 
@@ -701,6 +708,7 @@ model Employee {
   appraisalsAsSubject Appraisal[]        @relation("AppraisalSubject")
   appraisalReviews    AppraisalReviewer[] @relation("AppraisalReviewerEmployee")
   attendanceRecords    AttendanceRecord[]
+  expenseRequests      ExpenseRequest[]
 
   @@unique([organizationId, employeeNumber])
   @@map("employees")
@@ -872,4 +880,53 @@ model AttendanceRecord {
 
   @@unique([employeeId, date])
   @@map("attendance_records")
+}
+
+// ---------------------------------------------------------------------------
+// HR: Expense Requests. An employee's reimbursement claim — single-level
+// approval (admin/hr, matching the rest of this HR sub-module) rather than
+// a multi-step chain, simplest thing that works for now. Receipts attach
+// via Document's optional expenseRequestId (POST /documents), the same
+// versioned-attachment convention every other module uses, rather than a
+// bespoke upload route.
+// ---------------------------------------------------------------------------
+
+enum ExpenseCategory {
+  TRAVEL
+  MEALS
+  ACCOMMODATION
+  OFFICE_SUPPLIES
+  TRANSPORT
+  OTHER
+}
+
+enum ExpenseRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REIMBURSED
+}
+
+model ExpenseRequest {
+  id              String               @id @default(uuid())
+  organizationId  String
+  employeeId      String
+  category        ExpenseCategory
+  amount          Decimal              @db.Decimal(18, 2)
+  description     String?
+  incurredOn      DateTime
+  status          ExpenseRequestStatus @default(PENDING)
+  decidedById     String?
+  decisionComment String?
+  decidedAt       DateTime?
+  reimbursedAt    DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  employee     Employee     @relation(fields: [employeeId], references: [id])
+  decidedBy    User?        @relation("ExpenseRequestDecidedBy", fields: [decidedById], references: [id])
+  documents    Document[]
+
+  @@map("expense_requests")
 }

@@ -11,6 +11,9 @@ import type {
   EmployeeGrade,
   EmploymentStatus,
   EmploymentType,
+  ExpenseCategory,
+  ExpenseRequest,
+  ExpenseRequestStatus,
   Gender,
   HrDashboard,
   Shift,
@@ -181,4 +184,36 @@ export function updateAttendanceRecord(
   data: { status?: AttendanceStatus; clockIn?: string; clockOut?: string; notes?: string },
 ) {
   return apiClient.patch<AttendanceRecord>(`/attendance/${id}`, data);
+}
+
+// --- Expense Requests ---
+
+export function createMyExpenseRequest(data: {
+  organizationId: string;
+  category: ExpenseCategory;
+  amount: number;
+  incurredOn: string;
+  description?: string;
+}) {
+  return apiClient.post<ExpenseRequest>('/expense-requests/me', data);
+}
+
+export function getMyExpenseRequests(status?: ExpenseRequestStatus) {
+  const qs = status ? `?status=${status}` : '';
+  return apiClient.get<ExpenseRequest[]>(`/expense-requests/me${qs}`);
+}
+
+export function listExpenseRequests(
+  filters: { organizationId?: string; employeeId?: string; status?: ExpenseRequestStatus; category?: ExpenseCategory } = {},
+) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+  const qs = params.toString();
+  return apiClient.get<ExpenseRequest[]>(`/expense-requests${qs ? `?${qs}` : ''}`);
+}
+
+export function updateExpenseRequestStatus(id: string, status: ExpenseRequestStatus, decisionComment?: string) {
+  return apiClient.patch<ExpenseRequest>(`/expense-requests/${id}/status`, { status, decisionComment });
 }

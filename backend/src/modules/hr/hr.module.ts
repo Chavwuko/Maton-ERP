@@ -6,13 +6,21 @@ import { AttendanceController } from './attendance.controller';
 import { AttendanceService } from './attendance.service';
 import { EmployeesController } from './employees.controller';
 import { EmployeesService } from './employees.service';
+import { ExpenseRequestsController } from './expense-requests.controller';
+import { ExpenseRequestsService } from './expense-requests.service';
 import { ShiftsController } from './shifts.controller';
 import { ShiftsService } from './shifts.service';
 
 @Module({
   imports: [DocumentControlModule],
-  controllers: [EmployeesController, AppraisalsController, ShiftsController, AttendanceController],
-  providers: [EmployeesService, AppraisalsService, ShiftsService, AttendanceService],
-  exports: [EmployeesService, AppraisalsService, ShiftsService, AttendanceService],
+  controllers: [
+    EmployeesController,
+    AppraisalsController,
+    ShiftsController,
+    AttendanceController,
+    ExpenseRequestsController,
+  ],
+  providers: [EmployeesService, AppraisalsService, ShiftsService, AttendanceService, ExpenseRequestsService],
+  exports: [EmployeesService, AppraisalsService, ShiftsService, AttendanceService, ExpenseRequestsService],
 })
 export class HrModule {}
