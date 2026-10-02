@@ -98,16 +98,20 @@ jobs:
 
       # GitHub Actions' native `services:` block can't override a service
       # image's command/args, and MinIO needs `server /data --console-address
-      # ":9001"` — so it's started as a plain container step instead, using
-      # the same `mc ready local` healthcheck as docker-compose.yml.
+      # ":9001"` — so it's started as a plain container step instead.
+      #
+      # MinIO stopped publishing images to Docker Hub (`minio/minio` now fails
+      # with "pull access denied") and quay.io, so this uses Chainguard's
+      # maintained build. It's distroless — no `mc` inside — so readiness is
+      # polled over HTTP from the runner instead of via `docker exec`.
       - name: Start MinIO
         run: |
           docker run -d --name minio \
             -p 9000:9000 -p 9001:9001 \
             -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
-            minio/minio server /data --console-address ":9001"
+            cgr.dev/chainguard/minio:latest server /data --console-address ":9001"
           for i in $(seq 1 30); do
-            docker exec minio mc ready local && break
+            curl -sf http://localhost:9000/minio/health/ready && break
             sleep 1
           done
 
