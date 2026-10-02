@@ -23,7 +23,14 @@ services:
   # AUTH_MODE=local (see backend/.env.local.example) and creates the bucket
   # itself on first boot.
   minio:
-    image: minio/minio:latest
+    # MinIO no longer publishes images to Docker Hub (`minio/minio` fails with
+    # "pull access denied"); Chainguard's build is maintained and ships `mc`,
+    # so the healthcheck below works as-is.
+    image: cgr.dev/chainguard/minio:latest
+    # The image defaults to a non-root user, which can't write to a /data
+    # volume created by the old root-running minio/minio image. Root is fine
+    # for a local-dev-only container.
+    user: root
     container_name: erp-local-minio
     restart: unless-stopped
     environment:
