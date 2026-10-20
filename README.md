@@ -111,9 +111,10 @@ optional `workOrderId` for the same reason (photos, completion reports).
 Progressing a work order also keeps `Asset.status` truthful automatically —
 see the Maintenance module section below.
 
-Inventory adds `Warehouse`, `InventoryItem`, `StockLevel` (a running balance
-per item/warehouse), and `StockTransaction` (the immutable ledger every
-balance change is derived from) — see the Inventory module section below
+Inventory adds `Warehouse`, `InventoryItem`, `ItemCategory`, `StockLevel` (a
+running balance per item/warehouse), `StockTransaction` (the immutable
+ledger every balance change is derived from), and `Purchase`/`Consumption`
+(stock in from a supplier, stock out to a department/project) — see the Inventory module section below
 for the rule that keeps the ledger and the balance from drifting apart.
 
 Accounting adds `Vendor`, `Invoice` (payable or receivable), and `Payment`,
@@ -238,14 +239,39 @@ user.
 - `POST /warehouses` (body: `organizationId`, `code`, `name`, `location?`)
   — `code` must be unique within the organization (409 on conflict).
 - `GET /warehouses`, `GET /warehouses/:id` (detail includes stock levels).
+- `GET/POST /item-categories` (body: `organizationId`, `name`) — item
+  categories; `name` is unique within the organization (409).
 - `POST /inventory-items` (body: `organizationId`, `sku`, `name`,
-  `unitOfMeasure`, `description?`, `reorderPoint?`, `reorderQuantity?`) —
-  `sku` must be unique within the organization (409 on conflict).
+  `unitOfMeasure`, `description?`, `reorderPoint?`, `reorderQuantity?`,
+  `categoryId?`, `location?`, `unitCost?`, `openingStock?`,
+  `openingWarehouseId?`) — `sku` must be unique within the organization
+  (409). `openingStock` needs `openingWarehouseId` and is posted as an
+  `OPENING` ledger row.
+- `PATCH /inventory-items/:id` (no `unitCost` — cost only moves through
+  purchases), `DELETE /inventory-items/:id` (admin only, soft delete, only
+  while stock is zero).
 - `GET /inventory-items` (query: `organizationId?`,
   `belowReorderPoint=true`) — the reorder filter sums each item's stock
   across all warehouses and only returns items with a `reorderPoint` set
   whose total is under it.
+- `GET /inventory-items/overview` — one row per live item with
+  `totalOnHand`, `stockValue` (at the weighted-average cost) and `status`
+  (`IN_STOCK` / `LOW_STOCK` when at or under the reorder point /
+  `OUT_OF_STOCK`).
 - `GET /inventory-items/:id` — detail with per-warehouse stock levels.
+- `POST /purchases` (body: `warehouseId`, `itemId`, `vendorId`, `quantity`,
+  `unitCost`, `date?`, `poNumber?`, `notes?`) — receives stock and
+  re-averages the item's `unitCost` across all warehouses:
+  `(oldStock*oldCost + qty*cost) / (oldStock + qty)`. `GET /purchases`
+  (`vendorId?`, `itemId?`, `from?`, `to?`); `DELETE /purchases/:id` (admin)
+  soft-deletes and posts a `REVERSAL` ledger row (refused if the stock has
+  already been issued).
+- `POST /consumptions` (body: `warehouseId`, `itemId`, `quantity`,
+  `departmentId?`, `projectId?`, `issuedTo?`, `purpose?`, `date?`) — issues
+  stock at the item's current cost; must be charged to a department and/or a
+  project. `GET /consumptions` (`departmentId?`, `projectId?`, `itemId?`,
+  `from?`, `to?`); `DELETE /consumptions/:id` (admin) returns the stock via a
+  `REVERSAL` row.
 - `POST /stock-transactions` (body: `itemId`, `warehouseId`, `type`
   (`RECEIPT`/`ISSUE`/`ADJUSTMENT`), `quantity`, `notes?`, `workOrderId?`) —
   records one ledger entry and updates the running balance in the same
@@ -254,11 +280,23 @@ user.
   corrects an excess). Anything that would take a balance negative is
   rejected with 400 naming the current balance. Pass `workOrderId` to link
   a parts issue to the work order that consumed it.
+- `POST /stock-transactions/adjust` (body: `itemId`, `warehouseId`,
+  `countedQuantity`, `reason`) — a stock take: you supply what was counted
+  and the difference from the system balance is posted as an `ADJUSTMENT`.
 - `POST /stock-transactions/transfer` (body: `itemId`, `fromWarehouseId`,
   `toWarehouseId`, `quantity`) — moves stock between warehouses as one
   atomic pair of ledger rows (same insufficient-stock guard on the source).
 - `GET /stock-transactions` (query: `itemId?`, `warehouseId?`,
-  `workOrderId?`) — the ledger, newest first.
+  `workOrderId?`, `type?`, `from?`, `to?`) — the ledger, newest first. Every
+  row carries `balanceAfter`, and rows written by a purchase/issue carry
+  `refType`/`refId`.
+
+Quantities are decimals (rounded to 3 dp) so metres, kilograms and litres
+work; money is 2 dp. The Inventory screens are Items, Purchases,
+Consumption, Store (available stock + stock take, and the ledger) and
+Warehouses. This module was ported from an earlier Google Apps Script store
+system; its self-signup/approval users, appointments, dashboards and reports
+are the next phases.
 
 `StockLevel.quantityOnHand` is a denormalized cache of the `StockTransaction`
 ledger, kept in sync by `InventoryService`'s private `applyStockDelta` —

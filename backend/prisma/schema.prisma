@@ -20,21 +20,24 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  departments      Department[]
-  projects         Project[]
-  assets           Asset[]
-  documents        Document[]
-  workOrders       WorkOrder[]
-  warehouses       Warehouse[]
-  inventoryItems   InventoryItem[]
-  vendors          Vendor[]
-  invoices         Invoice[]
-  incidents        Incident[]
-  employees        Employee[]
-  appraisalCycles  AppraisalCycle[]
-  appraisals       Appraisal[]
-  shifts           Shift[]
-  expenseRequests  ExpenseRequest[]
+  departments     Department[]
+  projects        Project[]
+  assets          Asset[]
+  documents       Document[]
+  workOrders      WorkOrder[]
+  warehouses      Warehouse[]
+  inventoryItems  InventoryItem[]
+  vendors         Vendor[]
+  invoices        Invoice[]
+  incidents       Incident[]
+  employees       Employee[]
+  appraisalCycles AppraisalCycle[]
+  appraisals      Appraisal[]
+  shifts          Shift[]
+  expenseRequests ExpenseRequest[]
+  itemCategories  ItemCategory[]
+  purchases       Purchase[]
+  consumptions    Consumption[]
 
   @@map("organizations")
 }
@@ -46,9 +49,10 @@ model Department {
   code           String // short code, e.g. "MAINT", "HSE", "FIN"
   createdAt      DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id])
+  organization Organization  @relation(fields: [organizationId], references: [id])
   users        User[]
   documents    Document[]
+  consumptions Consumption[]
 
   @@unique([organizationId, code])
   @@map("departments")
@@ -83,10 +87,13 @@ model User {
   stockTransactions StockTransaction[]
   paymentsRecorded  Payment[]
 
-  incidentsReported       Incident[]        @relation("IncidentReportedBy")
-  correctiveActionsOwned  CorrectiveAction[] @relation("CorrectiveActionAssignee")
+  incidentsReported      Incident[]         @relation("IncidentReportedBy")
+  correctiveActionsOwned CorrectiveAction[] @relation("CorrectiveActionAssignee")
 
   expenseRequestsDecided ExpenseRequest[] @relation("ExpenseRequestDecidedBy")
+
+  purchasesReceived  Purchase[]    @relation("PurchaseReceivedBy")
+  consumptionsIssued Consumption[] @relation("ConsumptionIssuedBy")
 
   // One HR record per employed user. Optional because not every
   // Cognito-authenticated User is necessarily an onboarded employee
@@ -111,8 +118,8 @@ model Role {
 }
 
 model Permission {
-  id          String @id @default(uuid())
-  key         String @unique // e.g. "maintenance:work_order:create"
+  id          String  @id @default(uuid())
+  key         String  @unique // e.g. "maintenance:work_order:create"
   description String?
 
   roles RolePermission[]
@@ -145,12 +152,13 @@ model Project {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  organization Organization        @relation(fields: [organizationId], references: [id])
+  organization Organization       @relation(fields: [organizationId], references: [id])
   assets       Asset[]
   milestones   ProjectMilestone[]
   documents    Document[]
   invoices     Invoice[]
   incidents    Incident[]
+  consumptions Consumption[]
 
   @@unique([organizationId, code])
   @@map("projects")
@@ -245,43 +253,43 @@ model AuditLog {
 // ---------------------------------------------------------------------------
 
 model Document {
-  id             String         @id @default(uuid())
-  organizationId String
-  departmentId   String?
+  id               String         @id @default(uuid())
+  organizationId   String
+  departmentId     String?
   // Optional links so a project's contracts/permits/drawings, or a work
   // order's photos/reports, can be listed via GET /documents?projectId=...
   // or ?workOrderId=... without a separate join table.
-  projectId      String?
-  workOrderId    String?
-  invoiceId      String?
-  incidentId     String?
+  projectId        String?
+  workOrderId      String?
+  invoiceId        String?
+  incidentId       String?
   // Set when an employee self-submits a personal HR document (ID, cert,
   // signed contract, etc) via POST /employees/me/documents.
-  employeeId     String?
+  employeeId       String?
   // A reimbursement claim's receipt(s) — same POST /documents convention as
   // every other module, no dedicated expense-requests upload route needed.
   expenseRequestId String?
-  title          String
-  description    String?
-  category       String?
-  status         DocumentStatus @default(DRAFT)
+  title            String
+  description      String?
+  category         String?
+  status           DocumentStatus @default(DRAFT)
   // Denormalized pointer to the latest DocumentVersion.versionNumber, so
   // reads don't need to aggregate the versions table just to know "current".
-  currentVersion Int            @default(1)
-  ownerId        String
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  currentVersion   Int            @default(1)
+  ownerId          String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
-  organization Organization      @relation(fields: [organizationId], references: [id])
-  department   Department?       @relation(fields: [departmentId], references: [id])
-  project      Project?          @relation(fields: [projectId], references: [id])
-  workOrder    WorkOrder?        @relation(fields: [workOrderId], references: [id])
-  invoice      Invoice?          @relation(fields: [invoiceId], references: [id])
-  incident     Incident?         @relation(fields: [incidentId], references: [id])
-  employee     Employee?         @relation(fields: [employeeId], references: [id])
-  expenseRequest ExpenseRequest? @relation(fields: [expenseRequestId], references: [id])
-  owner        User              @relation("DocumentOwner", fields: [ownerId], references: [id])
-  versions     DocumentVersion[]
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  department     Department?       @relation(fields: [departmentId], references: [id])
+  project        Project?          @relation(fields: [projectId], references: [id])
+  workOrder      WorkOrder?        @relation(fields: [workOrderId], references: [id])
+  invoice        Invoice?          @relation(fields: [invoiceId], references: [id])
+  incident       Incident?         @relation(fields: [incidentId], references: [id])
+  employee       Employee?         @relation(fields: [employeeId], references: [id])
+  expenseRequest ExpenseRequest?   @relation(fields: [expenseRequestId], references: [id])
+  owner          User              @relation("DocumentOwner", fields: [ownerId], references: [id])
+  versions       DocumentVersion[]
 
   @@index([organizationId, status])
   @@map("documents")
@@ -365,11 +373,11 @@ model WorkOrder {
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  asset        Asset        @relation(fields: [assetId], references: [id])
-  requestedBy  User         @relation("WorkOrderRequestedBy", fields: [requestedById], references: [id])
-  assignedTo   User?        @relation("WorkOrderAssignedTo", fields: [assignedToId], references: [id])
-  documents    Document[]
+  organization      Organization       @relation(fields: [organizationId], references: [id])
+  asset             Asset              @relation(fields: [assetId], references: [id])
+  requestedBy       User               @relation("WorkOrderRequestedBy", fields: [requestedById], references: [id])
+  assignedTo        User?              @relation("WorkOrderAssignedTo", fields: [assignedToId], references: [id])
+  documents         Document[]
   stockTransactions StockTransaction[]
 
   @@index([organizationId, status])
@@ -415,40 +423,70 @@ model Warehouse {
   organization Organization       @relation(fields: [organizationId], references: [id])
   stockLevels  StockLevel[]
   transactions StockTransaction[]
+  purchases    Purchase[]
+  consumptions Consumption[]
 
   @@unique([organizationId, code])
   @@map("warehouses")
 }
 
+// Quantities (here and on StockLevel/StockTransaction/Purchase/Consumption)
+// are Float, not Int, because items are measured in metres, kg, litres etc —
+// InventoryService rounds every result to 3 decimal places so float drift
+// can't accumulate. Money stays Decimal.
 model InventoryItem {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   organizationId  String
   sku             String
   name            String
   description     String?
   unitOfMeasure   String // e.g. "EA", "L", "KG"
-  reorderPoint    Int?
-  reorderQuantity Int?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  reorderPoint    Float?
+  reorderQuantity Float?
+  categoryId      String?
+  // Default shelf/rack/yard position, independent of which warehouse holds it.
+  location        String?
+  // Weighted-average cost: recalculated on every purchase, applied to every
+  // issue. Never set directly by clients (see InventoryService.recordPurchase).
+  unitCost        Decimal   @default(0) @db.Decimal(18, 2)
+  // Soft delete only — ledger rows and past purchases/issues still point here.
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   organization Organization       @relation(fields: [organizationId], references: [id])
+  category     ItemCategory?      @relation(fields: [categoryId], references: [id])
   stockLevels  StockLevel[]
   transactions StockTransaction[]
+  purchases    Purchase[]
+  consumptions Consumption[]
 
   @@unique([organizationId, sku])
   @@map("inventory_items")
+}
+
+model ItemCategory {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  createdAt      DateTime @default(now())
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  items        InventoryItem[]
+
+  @@unique([organizationId, name])
+  @@map("item_categories")
 }
 
 // Running balance for one item in one warehouse. Absence of a row means
 // zero stock — a row is only created the first time a transaction touches
 // that (item, warehouse) pair.
 model StockLevel {
-  id              String   @id @default(uuid())
-  itemId          String
-  warehouseId     String
-  quantityOnHand  Int      @default(0)
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(uuid())
+  itemId         String
+  warehouseId    String
+  quantityOnHand Float    @default(0)
+  updatedAt      DateTime @updatedAt
 
   item      InventoryItem @relation(fields: [itemId], references: [id])
   warehouse Warehouse     @relation(fields: [warehouseId], references: [id])
@@ -463,16 +501,23 @@ model StockLevel {
 // second row (the receiving warehouse's own ledger) via
 // InventoryService.transfer().
 model StockTransaction {
-  id          String               @id @default(uuid())
-  itemId      String
-  warehouseId String
-  type        StockTransactionType
+  id            String               @id @default(uuid())
+  itemId        String
+  warehouseId   String
+  type          StockTransactionType
   // Signed: positive for stock moving in, negative for stock moving out.
-  quantity    Int
-  notes       String?
-  workOrderId String?
+  quantity      Float
+  // The (item, warehouse) balance right after this row was applied, so the
+  // ledger reads as a running statement without recomputing history.
+  balanceAfter  Float?
+  // What caused this row, e.g. refType "PURCHASE" + the Purchase id, or
+  // "CONSUMPTION" / "PURCHASE_DELETED" / "ISSUE_DELETED" for reversals.
+  refType       String?
+  refId         String?
+  notes         String?
+  workOrderId   String?
   performedById String
-  createdAt   DateTime             @default(now())
+  createdAt     DateTime             @default(now())
 
   item        InventoryItem @relation(fields: [itemId], references: [id])
   warehouse   Warehouse     @relation(fields: [warehouseId], references: [id])
@@ -488,6 +533,71 @@ enum StockTransactionType {
   ISSUE
   ADJUSTMENT
   TRANSFER
+  // First balance loaded when an item is created with stock already on hand.
+  OPENING
+  // Posted when a purchase or issue is deleted, undoing its stock effect
+  // without rewriting history.
+  REVERSAL
+}
+
+// A goods-received record: who supplied it, at what cost, into which
+// warehouse. Posting one raises stock and recalculates the item's
+// weighted-average cost. Deleted purchases are soft-deleted and reversed.
+model Purchase {
+  id             String    @id @default(uuid())
+  organizationId String
+  warehouseId    String
+  itemId         String
+  vendorId       String
+  poNumber       String?
+  date           DateTime
+  quantity       Float
+  unitCost       Decimal   @db.Decimal(18, 2)
+  total          Decimal   @db.Decimal(18, 2)
+  notes          String?
+  receivedById   String
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  warehouse    Warehouse     @relation(fields: [warehouseId], references: [id])
+  item         InventoryItem @relation(fields: [itemId], references: [id])
+  vendor       Vendor        @relation(fields: [vendorId], references: [id])
+  receivedBy   User          @relation("PurchaseReceivedBy", fields: [receivedById], references: [id])
+
+  @@index([organizationId, date])
+  @@map("purchases")
+}
+
+// Items issued out of a warehouse and charged to a department and/or a
+// project (at least one is required). Costed at the item's weighted-average
+// cost at the moment of issue.
+model Consumption {
+  id             String    @id @default(uuid())
+  organizationId String
+  warehouseId    String
+  itemId         String
+  date           DateTime
+  quantity       Float
+  unitCost       Decimal   @db.Decimal(18, 2)
+  total          Decimal   @db.Decimal(18, 2)
+  projectId      String?
+  departmentId   String?
+  issuedTo       String?
+  purpose        String?
+  issuedById     String
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  warehouse    Warehouse     @relation(fields: [warehouseId], references: [id])
+  item         InventoryItem @relation(fields: [itemId], references: [id])
+  project      Project?      @relation(fields: [projectId], references: [id])
+  department   Department?   @relation(fields: [departmentId], references: [id])
+  issuedBy     User          @relation("ConsumptionIssuedBy", fields: [issuedById], references: [id])
+
+  @@index([organizationId, date])
+  @@map("consumptions")
 }
 
 // ---------------------------------------------------------------------------
@@ -508,6 +618,7 @@ model Vendor {
 
   organization Organization @relation(fields: [organizationId], references: [id])
   invoices     Invoice[]
+  purchases    Purchase[]
 
   @@unique([organizationId, name])
   @@map("vendors")
@@ -562,13 +673,13 @@ enum InvoiceStatus {
 // remaining balance is total minus the sum of its Payments — derived, never
 // stored, so it can't drift from the ledger.
 model Payment {
-  id            String   @id @default(uuid())
-  invoiceId     String
-  amount        Decimal  @db.Decimal(18, 2)
-  method        String?
-  reference     String?
-  recordedById  String
-  createdAt     DateTime @default(now())
+  id           String   @id @default(uuid())
+  invoiceId    String
+  amount       Decimal  @db.Decimal(18, 2)
+  method       String?
+  reference    String?
+  recordedById String
+  createdAt    DateTime @default(now())
 
   invoice    Invoice @relation(fields: [invoiceId], references: [id])
   recordedBy User    @relation(fields: [recordedById], references: [id])
@@ -586,7 +697,7 @@ model Payment {
 // ---------------------------------------------------------------------------
 
 model Incident {
-  id             String         @id @default(uuid())
+  id             String           @id @default(uuid())
   organizationId String
   projectId      String?
   assetId        String?
@@ -594,12 +705,12 @@ model Incident {
   description    String?
   type           IncidentType
   severity       IncidentSeverity
-  status         IncidentStatus @default(REPORTED)
+  status         IncidentStatus   @default(REPORTED)
   occurredAt     DateTime
   location       String?
   reportedById   String
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   organization      Organization       @relation(fields: [organizationId], references: [id])
   project           Project?           @relation(fields: [projectId], references: [id])
@@ -698,17 +809,17 @@ model Employee {
   // most employees start unassigned until HR sets one via PATCH.
   shiftId        String?
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  user         User         @relation(fields: [userId], references: [id])
-  manager      Employee?    @relation("EmployeeManager", fields: [managerId], references: [id])
-  directReports Employee[]  @relation("EmployeeManager")
-  shift        Shift?       @relation(fields: [shiftId], references: [id])
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  user          User         @relation(fields: [userId], references: [id])
+  manager       Employee?    @relation("EmployeeManager", fields: [managerId], references: [id])
+  directReports Employee[]   @relation("EmployeeManager")
+  shift         Shift?       @relation(fields: [shiftId], references: [id])
 
-  documents          Document[]
-  appraisalsAsSubject Appraisal[]        @relation("AppraisalSubject")
+  documents           Document[]
+  appraisalsAsSubject Appraisal[]         @relation("AppraisalSubject")
   appraisalReviews    AppraisalReviewer[] @relation("AppraisalReviewerEmployee")
-  attendanceRecords    AttendanceRecord[]
-  expenseRequests      ExpenseRequest[]
+  attendanceRecords   AttendanceRecord[]
+  expenseRequests     ExpenseRequest[]
 
   @@unique([organizationId, employeeNumber])
   @@map("employees")
@@ -795,15 +906,15 @@ enum AppraisalStatus {
 // rater's relationship to the subject so feedback can be read/aggregated
 // per perspective (self vs. manager vs. peers vs. subordinates).
 model AppraisalReviewer {
-  id           String                    @id @default(uuid())
+  id           String                @id @default(uuid())
   appraisalId  String
   reviewerId   String
   relationType AppraisalRelationType
-  status       AppraisalReviewStatus     @default(PENDING)
+  status       AppraisalReviewStatus @default(PENDING)
   rating       Int?
   comments     String?
   submittedAt  DateTime?
-  createdAt    DateTime                  @default(now())
+  createdAt    DateTime              @default(now())
 
   appraisal Appraisal @relation(fields: [appraisalId], references: [id])
   reviewer  Employee  @relation("AppraisalReviewerEmployee", fields: [reviewerId], references: [id])

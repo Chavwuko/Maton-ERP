@@ -110,7 +110,7 @@ export function InventoryItemDetailPage() {
   return (
     <Stack>
       <div>
-        <Anchor component={Link} to="/inventory" size="sm">
+        <Anchor component={Link} to="/inventory/items" size="sm">
           ← All inventory items
         </Anchor>
       </div>

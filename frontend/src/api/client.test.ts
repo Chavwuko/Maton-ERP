@@ -82,6 +82,18 @@ describe('apiClient', () => {
     expect(init?.body).toBe(JSON.stringify({ name: 'Finance' }));
   });
 
+  it('DELETE sends the method and no body', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({ id: 'purchase-1' }));
+    const { apiClient } = await import('./client');
+
+    await apiClient.delete('/purchases/purchase-1');
+
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    expect(url).toBe('http://localhost:3000/purchases/purchase-1');
+    expect(init?.method).toBe('DELETE');
+    expect(init?.body).toBeUndefined();
+  });
+
   it('returns undefined for a 204 response without reading a body', async () => {
     vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 204 }));
     const { apiClient } = await import('./client');

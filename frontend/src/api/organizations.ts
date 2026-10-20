@@ -20,3 +20,8 @@ export function createDepartment(data: { organizationId: string; code: string; n
 export function updateDepartment(id: string, data: { name?: string; code?: string }) {
   return apiClient.patch<Department>(`/departments/${id}`, data);
 }
+
+export function listDepartments(filters: { organizationId?: string } = {}) {
+  const qs = filters.organizationId ? `?organizationId=${encodeURIComponent(filters.organizationId)}` : '';
+  return apiClient.get<Department[]>(`/departments${qs}`);
+}

@@ -48,7 +48,7 @@ export function WarehousesListPage() {
       <Group justify="space-between">
         <div>
           <Title order={2}>Warehouses</Title>
-          <Anchor component={Link} to="/inventory" size="sm">
+          <Anchor component={Link} to="/inventory/items" size="sm">
             ← Inventory items
           </Anchor>
         </div>

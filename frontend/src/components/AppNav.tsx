@@ -22,7 +22,17 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Project Control', path: '/projects' },
   { label: 'Assets', path: '/assets' },
   { label: 'Maintenance', path: '/maintenance' },
-  { label: 'Inventory', path: '/inventory' },
+  {
+    label: 'Inventory',
+    path: '/inventory',
+    children: [
+      { label: 'Items', path: '/inventory/items' },
+      { label: 'Purchases', path: '/inventory/purchases' },
+      { label: 'Consumption', path: '/inventory/consumption' },
+      { label: 'Store', path: '/inventory/store' },
+      { label: 'Warehouses', path: '/inventory/warehouses' },
+    ],
+  },
   { label: 'Accounting', path: '/accounting' },
   { label: 'HSE', path: '/hse' },
   {

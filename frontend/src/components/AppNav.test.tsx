@@ -25,4 +25,15 @@ describe('AppNav', () => {
     expect(dashboardLink).not.toHaveAttribute('data-active', 'true');
     expect(employeesLink).toHaveAttribute('data-active', 'true');
   });
+
+  it('expands Inventory into Items, Purchases, Consumption, Store and Warehouses and highlights the current one', () => {
+    renderWithProviders(<AppNav />, { route: '/inventory/purchases' });
+
+    expect(screen.getByRole('link', { name: 'Items' })).toHaveAttribute('href', '/inventory/items');
+    expect(screen.getByRole('link', { name: 'Consumption' })).toHaveAttribute('href', '/inventory/consumption');
+    expect(screen.getByRole('link', { name: 'Store' })).toHaveAttribute('href', '/inventory/store');
+    expect(screen.getByRole('link', { name: 'Warehouses' })).toHaveAttribute('href', '/inventory/warehouses');
+    expect(screen.getByRole('link', { name: 'Purchases' })).toHaveAttribute('data-active', 'true');
+    expect(screen.getByRole('link', { name: 'Items' })).not.toHaveAttribute('data-active', 'true');
+  });
 });

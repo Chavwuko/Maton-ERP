@@ -15,7 +15,10 @@ import { InvoicesListPage } from './modules/accounting/InvoicesListPage';
 import { VendorDetailPage } from './modules/accounting/VendorDetailPage';
 import { VendorsListPage } from './modules/accounting/VendorsListPage';
 import { InventoryItemDetailPage } from './modules/inventory/InventoryItemDetailPage';
+import { ConsumptionPage } from './modules/inventory/ConsumptionPage';
 import { InventoryItemsListPage } from './modules/inventory/InventoryItemsListPage';
+import { PurchasesPage } from './modules/inventory/PurchasesPage';
+import { StorePage } from './modules/inventory/StorePage';
 import { WarehouseDetailPage } from './modules/inventory/WarehouseDetailPage';
 import { WarehousesListPage } from './modules/inventory/WarehousesListPage';
 import { AppraisalCycleDetailPage } from './modules/hr/AppraisalCycleDetailPage';
@@ -49,7 +52,11 @@ export default function App() {
         <Route path="/accounting/invoices/:id" element={<InvoiceDetailPage />} />
         <Route path="/accounting/vendors" element={<VendorsListPage />} />
         <Route path="/accounting/vendors/:id" element={<VendorDetailPage />} />
-        <Route path="/inventory" element={<InventoryItemsListPage />} />
+        <Route path="/inventory" element={<Navigate to="/inventory/items" replace />} />
+        <Route path="/inventory/items" element={<InventoryItemsListPage />} />
+        <Route path="/inventory/purchases" element={<PurchasesPage />} />
+        <Route path="/inventory/consumption" element={<ConsumptionPage />} />
+        <Route path="/inventory/store" element={<StorePage />} />
         <Route path="/inventory/items/:id" element={<InventoryItemDetailPage />} />
         <Route path="/inventory/warehouses" element={<WarehousesListPage />} />
         <Route path="/inventory/warehouses/:id" element={<WarehouseDetailPage />} />
