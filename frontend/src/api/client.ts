@@ -1,5 +1,6 @@
 import { getAuthMode } from '../auth/authMode';
 import { getCurrentRole } from '../auth/roleStore';
+import { getSignupPreviewEmail } from '../auth/signupPreviewStore';
 
 const BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 
@@ -22,6 +23,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   // (credentials: 'include' below) instead of this dev-only header.
   if (getAuthMode() === 'local') {
     headers['x-local-role'] = getCurrentRole();
+    // Local-only sign-up preview: act as a brand-new self-registered user.
+    const previewEmail = getSignupPreviewEmail();
+    if (previewEmail) headers['x-local-signup'] = previewEmail;
   }
 
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -47,5 +51,6 @@ export const apiClient = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, data: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(data) }),
   patch: <T>(path: string, data: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(data) }),
+  put: <T>(path: string, data: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(data) }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };

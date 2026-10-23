@@ -13,6 +13,8 @@ const ROLES = [
   { name: 'project_control', description: 'Project control & tracking module' },
   { name: 'document_control', description: 'Document control module' },
   { name: 'inventory', description: 'Inventory & orders module' },
+  { name: 'staff', description: 'Requests and views stock; cannot see costs' },
+  { name: 'viewer', description: 'Read-only access' },
 ];
 
 async function main() {

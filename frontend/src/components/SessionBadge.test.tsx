@@ -18,6 +18,7 @@ describe('SessionBadge', () => {
       email: 'a@b.com',
       roleName: 'hse',
       departmentId: null,
+      status: 'ACTIVE', firstName: '', lastName: '', phone: null, rejectionReason: null,
     });
 
     renderWithProviders(<SessionBadge />);

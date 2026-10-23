@@ -34,6 +34,8 @@ export function ConsumptionPage() {
   const [to, setTo] = useState('');
   const canManage = hasRole(role, ['admin', 'inventory']);
   const isAdmin = hasRole(role, ['admin']);
+  const showCosts = role !== 'staff';
+  const columnCount = 7 + (showCosts ? 1 : 0) + (isAdmin ? 1 : 0);
 
   const {
     data: consumptions,
@@ -133,7 +135,7 @@ export function ConsumptionPage() {
               <Table.Th>Project</Table.Th>
               <Table.Th>Issued to</Table.Th>
               <Table.Th>Purpose</Table.Th>
-              <Table.Th>Cost</Table.Th>
+              {showCosts && <Table.Th>Cost</Table.Th>}
               {isAdmin && <Table.Th />}
             </Table.Tr>
           </Table.Thead>
@@ -149,7 +151,7 @@ export function ConsumptionPage() {
                 <Table.Td>{row.project ? `${row.project.code} — ${row.project.name}` : '—'}</Table.Td>
                 <Table.Td>{row.issuedTo ?? '—'}</Table.Td>
                 <Table.Td>{row.purpose ?? '—'}</Table.Td>
-                <Table.Td>{formatMoney(row.total)}</Table.Td>
+                {showCosts && <Table.Td>{formatMoney(row.total)}</Table.Td>}
                 {isAdmin && (
                   <Table.Td>
                     <ActionIcon
@@ -170,7 +172,7 @@ export function ConsumptionPage() {
             ))}
             {consumptions.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={isAdmin ? 9 : 8}>No stock issued yet.</Table.Td>
+                <Table.Td colSpan={columnCount}>No stock issued yet.</Table.Td>
               </Table.Tr>
             )}
           </Table.Tbody>

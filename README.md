@@ -525,26 +525,71 @@ HSE's corrective actions). Receipts attach via the ordinary `POST
   are terminal. `decidedAt`/`decidedById` are stamped on the
   approve/reject decision, not on the later reimbursement.
 
-## Users directory
+## Users, sign-up and approval
 
-A read-only directory over the `User` table — there's no create/update here:
-`User` rows are lazily created by the auth guards on first login (see "How
-authentication works"), so the directory only ever reads what's already
-there.
+People sign themselves up, then wait for an admin. Cognito's Hosted UI
+still handles the sign-up form and the emailed verification code; the
+approval layer sits in our own `users` table, so it works the same whichever
+login provider is behind it.
 
-- `GET /users` (query: `role?` — repeatable, e.g. `?role=admin&role=hse`;
-  `isActive?`) — list, open to any authenticated user (no `@Roles(...)`).
-  Used both by the `/users` directory page and by every `UserSelect` /
-  `UserMultiSelect` picker in the frontend.
-- `GET /users/:id` — detail with role nested; 404 if missing.
+**Lifecycle** (`User.status`): a first login creates the user as `PENDING`
+(or straight to `REJECTED` if sign-ups are closed or their email domain isn't
+allowed — see settings below). They submit their details, an admin approves
+(choosing a role and department) or rejects (with a reason), and an approved
+user is `ACTIVE`. An admin can later `DISABLE` and re-enable anyone. Someone
+Cognito already placed in a group was set up by an admin, so they skip the
+queue. `User.isActive` is kept in step (true only while `ACTIVE`).
 
-**Frontend**: `UserSelect` (single) and `UserMultiSelect` (multiple) in
-`frontend/src/components/` replace the raw-UUID `TextInput` fields that used
-to appear across Maintenance (work order assignment), HSE (corrective
-action assignee), Document Control (submit-for-review's reviewer list,
-filtered to `document_control`/`admin`), and HR (new employee's `userId`).
-Both fall back to showing the email when a lazily-created user still has
-blank first/last name.
+Until a user is `ACTIVE` the auth guards turn them away from every route
+(403 with a message naming why; 401 if disabled) except the few marked
+`@AllowInactive()`: `GET /auth/me`, `POST /auth/request-access` and
+`GET /departments` (the request form's department list).
+
+- `GET /auth/me` — the signed-in user, including `status`, names, phone and
+  `rejectionReason`, so the frontend can pick the right screen.
+- `POST /auth/request-access` (body: `firstName`, `lastName`, `phone?`,
+  `departmentId?`) — only for `PENDING` users; can be re-sent to correct
+  details while waiting.
+- `GET /users` (query: `role?` — repeatable; `isActive?`; `status?`) — open
+  to any authenticated user. Used by the directory and by every `UserSelect`
+  / `UserMultiSelect` picker (they pass `status=ACTIVE`, so waiting people
+  never show up in pickers).
+- `GET /users/:id`; `PATCH /users/:id` (admin; `firstName?`, `lastName?`,
+  `phone?`, `roleName?`, `departmentId?`).
+- `POST /users/:id/approve` (admin; body `roleName`, `departmentId?` — works
+  on `PENDING` or `REJECTED`), `/reject` (admin; `reason?`, `PENDING` only),
+  `/disable` and `/enable` (admin). An admin cannot disable themselves, and
+  the last active admin can be neither disabled nor demoted.
+- `GET /settings/access`, `PUT /settings/access` (admin; `openSignup?`,
+  `allowedEmailDomains?`) — turn sign-ups off, or restrict them to listed
+  email domains. Applies to new sign-ups only; stored in `app_settings`.
+
+Assignable roles: `admin`, `finance`, `hr`, `maintenance`, `hse`,
+`project_control`, `document_control`, `inventory`, `staff`, `viewer`
+(`staff`/`viewer` came from the old store system; keep the list in step with
+`prisma/seed.ts` and `department_seed_roles` in `infra/variables.tf`).
+`staff` can read stock but every cost figure (`unitCost`, `stockValue`,
+`total`) is stripped from Inventory responses for them
+(`StaffCostRedactionInterceptor`), and the screens hide the columns.
+
+**Trying it locally**: `AUTH_MODE=local` has no real sign-up, so the header
+switcher has a **Try sign-up** button. It acts as a made-up new user
+(`x-local-signup: <email>`): you see the request-access screen, then switch
+back, open **Users -> Access requests** as admin, approve or reject, and
+watch the waiting screen react (it re-checks every 10 seconds). **Exit
+sign-up preview** returns you to the normal role switcher.
+
+**Frontend**: `/users` has three tabs — the directory (edit role/department,
+disable/enable, admins only), **Access requests** (pending and rejected, with
+a count badge), and **Sign-up settings**. `UserSelect` (single) and
+`UserMultiSelect` (multiple) in `frontend/src/components/` replace the
+raw-UUID `TextInput` fields across Maintenance (work order assignment), HSE
+(corrective action assignee), Document Control (submit-for-review's reviewer
+list, filtered to `document_control`/`admin`), and HR (new employee's
+`userId`); they fall back to showing the email when a user has blank names.
+
+Not built yet: emailing people when they are approved/rejected, and the
+notification bell for admins — tracked in the Roadmap section below.
 
 ## Adding a new module
 
@@ -942,3 +987,11 @@ Standing list of planned work — not yet started unless noted otherwise.
 - **HR dashboard visual redesign** to match a specific sketched layout the
   user will provide (current `HRDashboardPage` layout — stat card row +
   chart grid — is a first pass, not the intended final design).
+- **Email notifications on access decisions** (to-do): when an admin
+  approves or rejects a sign-up (`UsersService.approve` / `reject`), email
+  the person — approval with their role, rejection with the reason. There is
+  no email service in the backend yet (the old store system sent these via
+  Apps Script); this needs one (e.g. SES, in step with the Cognito/AWS setup)
+  plus templates. The same service would later carry an email to admins when
+  a new request arrives, and the notification bell. Until then, people only
+  find out by reopening the waiting screen, which re-checks every 10 seconds.

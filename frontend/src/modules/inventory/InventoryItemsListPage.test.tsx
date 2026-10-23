@@ -339,4 +339,24 @@ describe('InventoryItemsListPage', () => {
 
     expect(await screen.findByText('No categories yet.')).toBeInTheDocument();
   });
+
+  it('hides unit cost and value from the staff role', async () => {
+    setCurrentRole('staff');
+    renderWithProviders(<InventoryItemsListPage />);
+    await screen.findByText('BRG-6205');
+
+    const table = within(screen.getByRole('table'));
+    expect(table.queryByText('Unit cost')).not.toBeInTheDocument();
+    expect(table.queryByText('Value')).not.toBeInTheDocument();
+    expect(table.queryByText('38.40')).not.toBeInTheDocument();
+    expect(table.getByText('Low stock')).toBeInTheDocument();
+  });
+
+  it('keeps the empty row as wide as the visible columns for staff', async () => {
+    setCurrentRole('staff');
+    vi.mocked(inventoryApi.getStockOverview).mockResolvedValue([]);
+    renderWithProviders(<InventoryItemsListPage />);
+
+    expect(await screen.findByText('No inventory items yet.')).toHaveAttribute('colspan', '7');
+  });
 });

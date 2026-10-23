@@ -231,4 +231,25 @@ describe('StorePage', () => {
       });
     });
   });
+
+  describe('for the staff role', () => {
+    it('shows stock but no value anywhere', async () => {
+      setCurrentRole('staff');
+      renderWithProviders(<StorePage />);
+      await screen.findByText('BRG-6205 — Ball Bearing 6205');
+
+      expect(screen.getByText('2 items')).toBeInTheDocument();
+      expect(screen.queryByText('Value')).not.toBeInTheDocument();
+      expect(screen.queryByText('stock value', { exact: false })).not.toBeInTheDocument();
+      expect(screen.queryByText('40.80')).not.toBeInTheDocument();
+    });
+
+    it('sizes the empty row to the visible columns', async () => {
+      setCurrentRole('staff');
+      vi.mocked(inventoryApi.getStockOverview).mockResolvedValue([]);
+      renderWithProviders(<StorePage />);
+
+      expect(await screen.findByText('No stock yet.')).toHaveAttribute('colspan', '4');
+    });
+  });
 });

@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { AllowInactive } from '../../auth/allow-inactive.decorator';
 import { Roles } from '../../auth/roles.guard';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
@@ -10,6 +11,9 @@ import { DepartmentsService } from './departments.service';
 export class DepartmentsController {
   constructor(private readonly departmentsService: DepartmentsService) {}
 
+  // Open to people still waiting for approval too: the request-access form
+  // asks which department they belong to.
+  @AllowInactive()
   @Get()
   findAll(@Query('organizationId') organizationId?: string) {
     return this.departmentsService.findAll({ organizationId });

@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
 import { createMockPrisma, MockPrisma } from '../../test/utils/mock-prisma';
+import { ALLOW_INACTIVE_KEY } from './allow-inactive.decorator';
 import { CognitoAuthGuard } from './cognito-auth.guard';
 
 jest.mock('aws-jwt-verify', () => ({
@@ -77,6 +78,11 @@ describe('CognitoAuthGuard', () => {
       email: 'a@b.com',
       departmentId: 'dept-1',
       isActive: true,
+      status: 'ACTIVE',
+      firstName: 'Ada',
+      lastName: 'Admin',
+      phone: '555',
+      rejectionReason: null,
       role: { name: 'admin' },
     } as never);
     const req = { headers: { authorization: 'Bearer good-token' } };
@@ -90,19 +96,26 @@ describe('CognitoAuthGuard', () => {
       email: 'a@b.com',
       roleName: 'admin',
       departmentId: 'dept-1',
+      status: 'ACTIVE',
+      firstName: 'Ada',
+      lastName: 'Admin',
+      phone: '555',
+      rejectionReason: null,
     });
   });
 
   it('lazily creates a local user record the first time a cognitoSub is seen', async () => {
-    reflector.getAllAndOverride.mockReturnValue(false);
+    reflector.getAllAndOverride.mockImplementation((key) => key === ALLOW_INACTIVE_KEY);
     verify.mockResolvedValue({ sub: 'sub-new', email: 'new@b.com' });
     prisma.user.findUnique.mockResolvedValue(null);
+    prisma.appSetting.findMany.mockResolvedValue([]);
     prisma.user.create.mockResolvedValue({
       id: 'user-2',
       cognitoSub: 'sub-new',
       email: 'new@b.com',
       departmentId: null,
-      isActive: true,
+      isActive: false,
+      status: 'PENDING',
       role: null,
     } as never);
     const req = { headers: { authorization: 'Bearer good-token' } };
@@ -111,17 +124,26 @@ describe('CognitoAuthGuard', () => {
 
     expect(prisma.user.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ cognitoSub: 'sub-new', email: 'new@b.com', firstName: '', lastName: '' }),
+        data: expect.objectContaining({
+          cognitoSub: 'sub-new',
+          email: 'new@b.com',
+          firstName: '',
+          lastName: '',
+          status: 'PENDING',
+          isActive: false,
+          rejectionReason: null,
+        }),
       }),
     );
     expect((req as { user?: { roleName: string | null } }).user?.roleName).toBeNull();
   });
 
   it('falls back to an empty email when the token payload has none', async () => {
-    reflector.getAllAndOverride.mockReturnValue(false);
+    reflector.getAllAndOverride.mockImplementation((key) => key === ALLOW_INACTIVE_KEY);
     verify.mockResolvedValue({ sub: 'sub-new' });
     prisma.user.findUnique.mockResolvedValue(null);
-    prisma.user.create.mockResolvedValue({ id: 'user-2', isActive: true, role: null } as never);
+    prisma.appSetting.findMany.mockResolvedValue([]);
+    prisma.user.create.mockResolvedValue({ id: 'user-2', isActive: false, status: 'PENDING', role: null } as never);
 
     await guard.canActivate(contextFor({ headers: { authorization: 'Bearer good-token' } }));
 
@@ -133,7 +155,7 @@ describe('CognitoAuthGuard', () => {
   it('rejects a deactivated user', async () => {
     reflector.getAllAndOverride.mockReturnValue(false);
     verify.mockResolvedValue({ sub: 'sub-1' });
-    prisma.user.findUnique.mockResolvedValue({ id: 'user-1', isActive: false, role: null } as never);
+    prisma.user.findUnique.mockResolvedValue({ id: 'user-1', isActive: false, status: 'DISABLED', role: null } as never);
 
     await expect(
       guard.canActivate(contextFor({ headers: { authorization: 'Bearer good-token' } })),
@@ -149,6 +171,7 @@ describe('CognitoAuthGuard', () => {
       email: 'a@b.com',
       departmentId: null,
       isActive: true,
+      status: 'ACTIVE',
       role: null,
     } as never);
     const req = { headers: {}, cookies: { erp_session: 'cookie-token' } };
@@ -174,6 +197,7 @@ describe('CognitoAuthGuard', () => {
       email: 'a@b.com',
       departmentId: null,
       isActive: true,
+      status: 'ACTIVE',
       roleId: null,
       role: null,
     } as never);
@@ -193,6 +217,7 @@ describe('CognitoAuthGuard', () => {
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
       isActive: true,
+      status: 'ACTIVE',
       roleId: null,
       role: null,
     } as never);
@@ -209,6 +234,7 @@ describe('CognitoAuthGuard', () => {
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
       isActive: true,
+      status: 'ACTIVE',
       roleId: 'role-hse',
       role: { name: 'hse' },
     } as never);
@@ -225,6 +251,7 @@ describe('CognitoAuthGuard', () => {
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
       isActive: true,
+      status: 'ACTIVE',
       roleId: null,
       role: null,
     } as never);
@@ -243,6 +270,7 @@ describe('CognitoAuthGuard', () => {
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
       isActive: true,
+      status: 'ACTIVE',
       roleId: 'role-admin',
       role: { name: 'admin' },
     } as never);
@@ -250,5 +278,115 @@ describe('CognitoAuthGuard', () => {
     await guard.canActivate(contextFor({ headers: { authorization: 'Bearer good-token' } }));
 
     expect(prisma.role.findUnique).not.toHaveBeenCalled();
+  });
+
+  describe('account status', () => {
+    const request = () => ({ headers: { authorization: 'Bearer good-token' } });
+
+    it('puts a brand-new sign-up in the approval queue', async () => {
+      reflector.getAllAndOverride.mockReturnValue(false);
+      verify.mockResolvedValue({ sub: 'sub-new', email: 'new@b.com' });
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.appSetting.findMany.mockResolvedValue([]);
+      prisma.user.create.mockResolvedValue({ id: 'u', status: 'PENDING', role: null } as never);
+
+      await expect(guard.canActivate(contextFor(request()))).rejects.toThrow(
+        'Your account is awaiting administrator approval',
+      );
+    });
+
+    it('creates the user as REJECTED, with the reason, when sign-ups are closed', async () => {
+      reflector.getAllAndOverride.mockImplementation((key) => key === ALLOW_INACTIVE_KEY);
+      verify.mockResolvedValue({ sub: 'sub-new', email: 'new@b.com' });
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.appSetting.findMany.mockResolvedValue([{ key: 'signup.open', value: 'false' }] as never);
+      prisma.user.create.mockResolvedValue({ id: 'u', status: 'REJECTED', role: null } as never);
+
+      await guard.canActivate(contextFor(request()));
+
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'REJECTED',
+            isActive: false,
+            rejectionReason: 'Sign-ups are currently closed. Contact an administrator.',
+          }),
+        }),
+      );
+    });
+
+    it('creates the user as REJECTED when their email domain is not allowed', async () => {
+      reflector.getAllAndOverride.mockImplementation((key) => key === ALLOW_INACTIVE_KEY);
+      verify.mockResolvedValue({ sub: 'sub-new', email: 'new@gmail.com' });
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.appSetting.findMany.mockResolvedValue([{ key: 'signup.allowedDomains', value: 'acme.com' }] as never);
+      prisma.user.create.mockResolvedValue({ id: 'u', status: 'REJECTED', role: null } as never);
+
+      await guard.canActivate(contextFor(request()));
+
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'REJECTED' }) }),
+      );
+    });
+
+    it('skips the approval queue for someone Cognito already placed in a group', async () => {
+      reflector.getAllAndOverride.mockReturnValue(false);
+      verify.mockResolvedValue({ sub: 'sub-new', email: 'new@b.com', 'cognito:groups': ['hse'] });
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.create.mockResolvedValue({ id: 'u', status: 'ACTIVE', roleId: null, role: null } as never);
+      prisma.role.findUnique.mockResolvedValue({ id: 'role-hse', name: 'hse' } as never);
+
+      await expect(guard.canActivate(contextFor(request()))).resolves.toBe(true);
+
+      expect(prisma.appSetting.findMany).not.toHaveBeenCalled();
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'ACTIVE', isActive: true }) }),
+      );
+    });
+
+    it('activates a waiting user once an admin adds them to a Cognito group', async () => {
+      reflector.getAllAndOverride.mockReturnValue(false);
+      verify.mockResolvedValue({ sub: 'sub-1', 'cognito:groups': ['hse'] });
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'PENDING', roleId: null, role: null } as never);
+      prisma.user.update
+        .mockResolvedValueOnce({ id: 'user-1', status: 'ACTIVE', roleId: null, role: null } as never)
+        .mockResolvedValueOnce({} as never);
+      prisma.role.findUnique.mockResolvedValue({ id: 'role-hse', name: 'hse' } as never);
+
+      await expect(guard.canActivate(contextFor(request()))).resolves.toBe(true);
+
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'user-1' }, data: { status: 'ACTIVE', isActive: true } }),
+      );
+    });
+
+    it('blocks a rejected user from ordinary routes', async () => {
+      reflector.getAllAndOverride.mockReturnValue(false);
+      verify.mockResolvedValue({ sub: 'sub-1' });
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'REJECTED', role: null } as never);
+
+      await expect(guard.canActivate(contextFor(request()))).rejects.toThrow('Your access request was not approved');
+    });
+
+    it('lets a pending, rejected or disabled user through an @AllowInactive() route', async () => {
+      reflector.getAllAndOverride.mockImplementation((key) => key === ALLOW_INACTIVE_KEY);
+      verify.mockResolvedValue({ sub: 'sub-1' });
+
+      for (const status of ['PENDING', 'REJECTED', 'DISABLED']) {
+        prisma.user.findUnique.mockResolvedValue({
+          id: 'user-1',
+          status,
+          firstName: 'Pat',
+          lastName: 'Pending',
+          phone: null,
+          rejectionReason: status === 'REJECTED' ? 'No' : null,
+          role: null,
+        } as never);
+        const req = request();
+
+        await expect(guard.canActivate(contextFor(req))).resolves.toBe(true);
+        expect(req).toHaveProperty('user.status', status);
+      }
+    });
   });
 });

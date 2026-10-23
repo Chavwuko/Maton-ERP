@@ -1,5 +1,8 @@
-import { Controller, Get, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { CompleteProfileDto } from '../modules/users/dto/complete-profile.dto';
+import { UsersService } from '../modules/users/users.service';
+import { AllowInactive } from './allow-inactive.decorator';
 import { Public } from './public.decorator';
 import { CognitoOAuthService } from './cognito-oauth.service';
 
@@ -12,7 +15,10 @@ const SESSION_COOKIE = 'erp_session';
 // already points here rather than at the frontend.
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly oauth: CognitoOAuthService) {}
+  constructor(
+    private readonly oauth: CognitoOAuthService,
+    private readonly users: UsersService,
+  ) {}
 
   @Public()
   @Get('login')
@@ -49,8 +55,18 @@ export class AuthController {
     res.redirect(this.oauth.getLogoutUrl());
   }
 
+  // Reachable while the account is still pending/rejected/disabled so the
+  // frontend can show the right screen instead of an error.
+  @AllowInactive()
   @Get('me')
   me(@Req() req: Request) {
     return req.user;
+  }
+
+  // A freshly signed-up user submits their details and waits for an admin.
+  @AllowInactive()
+  @Post('request-access')
+  requestAccess(@Body() dto: CompleteProfileDto, @Req() req: Request) {
+    return this.users.completeProfile(req.user!.id, dto);
   }
 }

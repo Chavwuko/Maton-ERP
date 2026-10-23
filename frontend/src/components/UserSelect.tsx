@@ -18,8 +18,8 @@ interface UserSelectProps extends Partial<SelectProps> {
 
 export function UserSelect({ label = 'User', roleFilter, ...rest }: UserSelectProps) {
   const { data } = useQuery({
-    queryKey: ['users', { role: roleFilter }],
-    queryFn: () => listUsers({ role: roleFilter }),
+    queryKey: ['users', { role: roleFilter, status: 'ACTIVE' }],
+    queryFn: () => listUsers({ role: roleFilter, status: 'ACTIVE' }),
   });
 
   return (

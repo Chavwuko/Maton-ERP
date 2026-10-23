@@ -33,6 +33,8 @@ export function PurchasesPage() {
   const [to, setTo] = useState('');
   const canManage = hasRole(role, ['admin', 'inventory']);
   const isAdmin = hasRole(role, ['admin']);
+  const showCosts = role !== 'staff';
+  const columnCount = 6 + (showCosts ? 2 : 0) + (isAdmin ? 1 : 0);
 
   const {
     data: purchases,
@@ -132,8 +134,8 @@ export function PurchasesPage() {
               <Table.Th>Supplier</Table.Th>
               <Table.Th>Warehouse</Table.Th>
               <Table.Th>Quantity</Table.Th>
-              <Table.Th>Unit cost</Table.Th>
-              <Table.Th>Total</Table.Th>
+              {showCosts && <Table.Th>Unit cost</Table.Th>}
+              {showCosts && <Table.Th>Total</Table.Th>}
               {isAdmin && <Table.Th />}
             </Table.Tr>
           </Table.Thead>
@@ -148,8 +150,8 @@ export function PurchasesPage() {
                 <Table.Td>
                   {formatQty(purchase.quantity)} {purchase.item?.unitOfMeasure}
                 </Table.Td>
-                <Table.Td>{formatMoney(purchase.unitCost)}</Table.Td>
-                <Table.Td>{formatMoney(purchase.total)}</Table.Td>
+                {showCosts && <Table.Td>{formatMoney(purchase.unitCost)}</Table.Td>}
+                {showCosts && <Table.Td>{formatMoney(purchase.total)}</Table.Td>}
                 {isAdmin && (
                   <Table.Td>
                     <ActionIcon
@@ -170,7 +172,7 @@ export function PurchasesPage() {
             ))}
             {purchases.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={isAdmin ? 9 : 8}>No purchases yet.</Table.Td>
+                <Table.Td colSpan={columnCount}>No purchases yet.</Table.Td>
               </Table.Tr>
             )}
           </Table.Tbody>

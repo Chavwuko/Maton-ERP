@@ -4,6 +4,11 @@ vi.mock('../auth/roleStore', () => ({
   getCurrentRole: () => 'admin',
 }));
 
+let previewEmail: string | null = null;
+vi.mock('../auth/signupPreviewStore', () => ({
+  getSignupPreviewEmail: () => previewEmail,
+}));
+
 let authMode = 'local';
 vi.mock('../auth/authMode', () => ({
   getAuthMode: () => authMode,
@@ -19,6 +24,7 @@ function jsonResponse(body: unknown, init?: { status?: number }) {
 describe('apiClient', () => {
   beforeEach(() => {
     authMode = 'local';
+    previewEmail = null;
     vi.stubGlobal('fetch', vi.fn());
   });
 
@@ -58,6 +64,33 @@ describe('apiClient', () => {
 
     const [, init] = vi.mocked(fetch).mock.calls[0];
     expect((init?.headers as Record<string, string>)['x-local-role']).toBeUndefined();
+  });
+
+  it('sends x-local-signup only while previewing the sign-up flow locally', async () => {
+    vi.mocked(fetch).mockImplementation(() => Promise.resolve(jsonResponse({})));
+    const { apiClient } = await import('./client');
+
+    await apiClient.get('/auth/me');
+    expect((vi.mocked(fetch).mock.calls[0][1]?.headers as Record<string, string>)['x-local-signup']).toBeUndefined();
+
+    previewEmail = 'new@acme.test';
+    await apiClient.get('/auth/me');
+    expect((vi.mocked(fetch).mock.calls[1][1]?.headers as Record<string, string>)['x-local-signup']).toBe('new@acme.test');
+
+    authMode = 'cognito';
+    await apiClient.get('/auth/me');
+    expect((vi.mocked(fetch).mock.calls[2][1]?.headers as Record<string, string>)['x-local-signup']).toBeUndefined();
+  });
+
+  it('PUT sends the method and JSON-stringified body', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({}));
+    const { apiClient } = await import('./client');
+
+    await apiClient.put('/settings/access', { openSignup: false });
+
+    const [, init] = vi.mocked(fetch).mock.calls[0];
+    expect(init?.method).toBe('PUT');
+    expect(init?.body).toBe(JSON.stringify({ openSignup: false }));
   });
 
   it('POST sends the method and JSON-stringified body', async () => {

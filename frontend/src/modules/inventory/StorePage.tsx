@@ -40,6 +40,7 @@ const LEDGER_TYPES: StockTransactionType[] = ['OPENING', 'RECEIPT', 'ISSUE', 'AD
 
 function AvailableStock() {
   const { role } = useRole();
+  const showCosts = role !== 'staff';
   const queryClient = useQueryClient();
   const [adjusting, setAdjusting] = useState<StockOverviewRow | null>(null);
   const canManage = hasRole(role, ['admin', 'inventory']);
@@ -94,7 +95,13 @@ function AvailableStock() {
       {items && (
         <>
           <Text size="sm">
-            {items.length} item{items.length === 1 ? '' : 's'} · stock value <b>{formatMoney(totalValue)}</b>
+            {items.length} item{items.length === 1 ? '' : 's'}
+            {showCosts && (
+              <>
+                {' '}
+                · stock value <b>{formatMoney(totalValue)}</b>
+              </>
+            )}
           </Text>
           <Table striped highlightOnHover>
             <Table.Thead>
@@ -102,7 +109,7 @@ function AvailableStock() {
                 <Table.Th>Item</Table.Th>
                 <Table.Th>On hand</Table.Th>
                 <Table.Th>Reorder point</Table.Th>
-                <Table.Th>Value</Table.Th>
+                {showCosts && <Table.Th>Value</Table.Th>}
                 <Table.Th>Status</Table.Th>
                 {canManage && <Table.Th />}
               </Table.Tr>
@@ -119,7 +126,7 @@ function AvailableStock() {
                     {formatQty(item.totalOnHand)} {item.unitOfMeasure}
                   </Table.Td>
                   <Table.Td>{item.reorderPoint ?? '—'}</Table.Td>
-                  <Table.Td>{formatMoney(item.stockValue)}</Table.Td>
+                  {showCosts && <Table.Td>{formatMoney(item.stockValue)}</Table.Td>}
                   <Table.Td>
                     <Badge color={STOCK_STATUS_COLORS[item.status]} variant="light">
                       {STOCK_STATUS_LABELS[item.status]}
@@ -136,7 +143,7 @@ function AvailableStock() {
               ))}
               {items.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={canManage ? 6 : 5}>No stock yet.</Table.Td>
+                  <Table.Td colSpan={4 + (showCosts ? 1 : 0) + (canManage ? 1 : 0)}>No stock yet.</Table.Td>
                 </Table.Tr>
               )}
             </Table.Tbody>

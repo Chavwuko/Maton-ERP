@@ -97,5 +97,5 @@ variable "frontend_url" {
 variable "department_seed_roles" {
   description = "Initial Cognito groups representing top-level ERP roles"
   type        = list(string)
-  default     = ["admin", "finance", "hr", "maintenance", "hse", "project_control", "document_control", "inventory"]
+  default     = ["admin", "finance", "hr", "maintenance", "hse", "project_control", "document_control", "inventory", "staff", "viewer"]
 }

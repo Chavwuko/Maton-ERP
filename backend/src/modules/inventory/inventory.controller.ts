@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseInterceptors } from '@nestjs/common';
 import { StockTransactionType } from '@prisma/client';
 import { Request } from 'express';
 import { Roles } from '../../auth/roles.guard';
@@ -12,13 +12,15 @@ import { CreateWarehouseDto } from './dto/create-warehouse.dto';
 import { TransferStockDto } from './dto/transfer-stock.dto';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
 import { InventoryService } from './inventory.service';
+import { StaffCostRedactionInterceptor } from './staff-cost-redaction.interceptor';
 
 // Any authenticated user can read; every mutation (registering a warehouse
 // or item, recording a movement, purchase or issue) is restricted to
 // admin/inventory since it changes a quantity other people rely on being
 // accurate. Deleting a purchase or issue (which posts a reversing ledger
-// row) is admin-only.
+// row) is admin-only. Cost figures are hidden from the `staff` role.
 @Controller()
+@UseInterceptors(StaffCostRedactionInterceptor)
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 

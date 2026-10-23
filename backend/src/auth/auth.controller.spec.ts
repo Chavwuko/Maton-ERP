@@ -1,5 +1,6 @@
 import type { Response } from 'express';
 import { AuthController } from './auth.controller';
+import { UsersService } from '../modules/users/users.service';
 import { CognitoOAuthService } from './cognito-oauth.service';
 
 function fakeResponse(): jest.Mocked<Response> {
@@ -12,6 +13,7 @@ function fakeResponse(): jest.Mocked<Response> {
 
 describe('AuthController', () => {
   let oauth: jest.Mocked<CognitoOAuthService>;
+  let users: jest.Mocked<UsersService>;
   let controller: AuthController;
 
   beforeEach(() => {
@@ -21,7 +23,8 @@ describe('AuthController', () => {
       exchangeCodeForTokens: jest.fn(),
       frontendUrl: 'https://app.example.com',
     } as unknown as jest.Mocked<CognitoOAuthService>;
-    controller = new AuthController(oauth);
+    users = { completeProfile: jest.fn() } as unknown as jest.Mocked<UsersService>;
+    controller = new AuthController(oauth, users);
   });
 
   it('login redirects straight to the Hosted UI authorize URL', () => {
@@ -84,5 +87,14 @@ describe('AuthController', () => {
     const req = { user: { id: 'user-1', email: 'a@b.com', roleName: 'admin', departmentId: null, cognitoSub: 'sub-1' } };
 
     expect(controller.me(req as never)).toBe(req.user);
+  });
+
+  it('requestAccess saves the signed-in user their own details', async () => {
+    const dto = { firstName: 'Pat', lastName: 'Pending' };
+    users.completeProfile.mockResolvedValue({ id: 'user-1' } as never);
+
+    await expect(controller.requestAccess(dto, { user: { id: 'user-1' } } as never)).resolves.toEqual({ id: 'user-1' });
+
+    expect(users.completeProfile).toHaveBeenCalledWith('user-1', dto);
   });
 });

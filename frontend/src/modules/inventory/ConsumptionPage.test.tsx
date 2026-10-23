@@ -234,4 +234,13 @@ describe('ConsumptionPage', () => {
     await user.click(button);
     expect(await screen.findByText('Cannot delete')).toBeInTheDocument();
   });
+
+  it('hides the cost column from the staff role', async () => {
+    setCurrentRole('staff');
+    renderWithProviders(<ConsumptionPage />);
+    await screen.findByText('Joe Fitter');
+
+    expect(screen.queryByText('Cost')).not.toBeInTheDocument();
+    expect(screen.queryByText('49.20')).not.toBeInTheDocument();
+  });
 });

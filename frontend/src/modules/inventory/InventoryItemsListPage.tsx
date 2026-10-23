@@ -57,6 +57,9 @@ export function InventoryItemsListPage() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const canManage = hasRole(role, ['admin', 'inventory']);
   const isAdmin = hasRole(role, ['admin']);
+  // Staff see stock, never money (the API strips costs for them too).
+  const showCosts = role !== 'staff';
+  const columnCount = 7 + (showCosts ? 2 : 0) + (canManage ? 1 : 0);
 
   const {
     data: items,
@@ -279,8 +282,8 @@ export function InventoryItemsListPage() {
               <Table.Th>Unit</Table.Th>
               <Table.Th>Location</Table.Th>
               <Table.Th>On hand</Table.Th>
-              <Table.Th>Unit cost</Table.Th>
-              <Table.Th>Value</Table.Th>
+              {showCosts && <Table.Th>Unit cost</Table.Th>}
+              {showCosts && <Table.Th>Value</Table.Th>}
               <Table.Th>Status</Table.Th>
               {canManage && <Table.Th />}
             </Table.Tr>
@@ -298,8 +301,8 @@ export function InventoryItemsListPage() {
                 <Table.Td>{item.unitOfMeasure}</Table.Td>
                 <Table.Td>{item.location ?? '—'}</Table.Td>
                 <Table.Td>{formatQty(item.totalOnHand)}</Table.Td>
-                <Table.Td>{formatMoney(item.unitCost)}</Table.Td>
-                <Table.Td>{formatMoney(item.stockValue)}</Table.Td>
+                {showCosts && <Table.Td>{formatMoney(item.unitCost)}</Table.Td>}
+                {showCosts && <Table.Td>{formatMoney(item.stockValue)}</Table.Td>}
                 <Table.Td>
                   <Badge color={STOCK_STATUS_COLORS[item.status]} variant="light">
                     {STOCK_STATUS_LABELS[item.status]}
@@ -331,12 +334,12 @@ export function InventoryItemsListPage() {
             ))}
             {items.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={canManage ? 10 : 9}>No inventory items yet.</Table.Td>
+                <Table.Td colSpan={columnCount}>No inventory items yet.</Table.Td>
               </Table.Tr>
             )}
             {items.length > 0 && visible.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={canManage ? 10 : 9}>No items match the current filters.</Table.Td>
+                <Table.Td colSpan={columnCount}>No items match the current filters.</Table.Td>
               </Table.Tr>
             )}
           </Table.Tbody>

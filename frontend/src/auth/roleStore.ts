@@ -12,6 +12,8 @@ export const ROLES = [
   'project_control',
   'document_control',
   'inventory',
+  'staff',
+  'viewer',
 ] as const;
 
 export type Role = (typeof ROLES)[number];

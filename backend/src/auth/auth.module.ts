@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { APP_GUARD, Reflector } from '@nestjs/core';
 import { PrismaService } from '../database/prisma.service';
+import { UsersModule } from '../modules/users/users.module';
 import { AuthController } from './auth.controller';
 import { CognitoAuthGuard } from './cognito-auth.guard';
 import { CognitoOAuthService } from './cognito-oauth.service';
@@ -9,6 +10,7 @@ import { LocalDevAuthGuard } from './local-dev-auth.guard';
 import { RolesGuard } from './roles.guard';
 
 @Module({
+  imports: [UsersModule],
   controllers: [AuthController],
   providers: [
     CognitoOAuthService,

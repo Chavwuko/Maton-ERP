@@ -7,9 +7,13 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
+import type { UserStatus } from '@prisma/client';
 import { Request } from 'express';
 import { PrismaService } from '../database/prisma.service';
+import { getAccessSettings, signupBlockedReason } from '../modules/settings/access-settings';
+import { ALLOW_INACTIVE_KEY } from './allow-inactive.decorator';
 import { IS_PUBLIC_KEY } from './public.decorator';
+import { assertAccountUsable } from './user-status';
 
 export interface AuthenticatedUser {
   id: string;
@@ -17,6 +21,11 @@ export interface AuthenticatedUser {
   email: string;
   roleName: string | null;
   departmentId: string | null;
+  status: UserStatus;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  rejectionReason: string | null;
 }
 
 // Extends Express's Request type so `req.user` is typed everywhere downstream.
@@ -73,21 +82,44 @@ export class CognitoAuthGuard implements CanActivate {
       include: { role: true },
     });
 
+    const groups = (payload as Record<string, unknown>)['cognito:groups'] as string[] | undefined;
+    const email = ((payload as Record<string, unknown>).email as string) ?? '';
+
     if (!user) {
+      // Someone Cognito already placed in a group was provisioned by an
+      // admin, so they skip the approval queue. Everyone else who signed
+      // themselves up waits as PENDING — unless sign-ups are closed or their
+      // email domain isn't allowed, in which case they're turned away now.
+      const blocked = groups?.length ? null : signupBlockedReason(await getAccessSettings(this.prisma), email);
+      const status: UserStatus = groups?.length ? 'ACTIVE' : blocked ? 'REJECTED' : 'PENDING';
       user = await this.prisma.user.create({
         data: {
           cognitoSub: payload.sub,
-          email: (payload as Record<string, unknown>).email as string ?? '',
+          email,
           firstName: '',
           lastName: '',
+          status,
+          isActive: status === 'ACTIVE',
+          rejectionReason: blocked,
         },
         include: { role: true },
       });
     }
 
-    if (!user.isActive) {
-      throw new UnauthorizedException('User account is deactivated');
+    // An admin who adds a waiting user to a Cognito group is approving them.
+    if (groups?.length && user.status === 'PENDING') {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { status: 'ACTIVE', isActive: true },
+        include: { role: true },
+      });
     }
+
+    const allowInactive = !!this.reflector.getAllAndOverride<boolean>(ALLOW_INACTIVE_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    assertAccountUsable(user.status, allowInactive);
 
     const role = await this.syncRoleFromCognitoGroups(user, payload);
 
@@ -97,6 +129,11 @@ export class CognitoAuthGuard implements CanActivate {
       email: user.email,
       roleName: role?.name ?? user.role?.name ?? null,
       departmentId: user.departmentId,
+      status: user.status,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone,
+      rejectionReason: user.rejectionReason,
     };
 
     return true;

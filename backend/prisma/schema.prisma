@@ -61,21 +61,49 @@ model Department {
 // One row per Cognito-authenticated identity. `cognitoSub` is the stable
 // unique identifier from the Cognito JWT `sub` claim — never the email,
 // which a user could in principle change.
-model User {
-  id           String   @id @default(uuid())
-  cognitoSub   String   @unique
-  email        String   @unique
-  firstName    String
-  lastName     String
-  departmentId String?
-  roleId       String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+enum UserStatus {
+  PENDING
+  ACTIVE
+  DISABLED
+  REJECTED
+}
 
-  department Department? @relation(fields: [departmentId], references: [id])
-  role       Role?       @relation(fields: [roleId], references: [id])
-  auditLogs  AuditLog[]
+// Small key/value store for admin-editable switches (e.g. whether public
+// sign-up is open). Values are strings; callers parse them.
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+model User {
+  id              String     @id @default(uuid())
+  cognitoSub      String     @unique
+  email           String     @unique
+  firstName       String
+  lastName        String
+  departmentId    String?
+  roleId          String?
+  // `isActive` is kept for existing queries; UsersService is the only place
+  // that changes `status`, and it keeps the two in step (isActive is true
+  // exactly when status is ACTIVE).
+  isActive        Boolean    @default(true)
+  status          UserStatus @default(ACTIVE)
+  phone           String?
+  requestedAt     DateTime?
+  reviewedAt      DateTime?
+  reviewedById    String?
+  rejectionReason String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  department    Department? @relation(fields: [departmentId], references: [id])
+  role          Role?       @relation(fields: [roleId], references: [id])
+  reviewedBy    User?       @relation("UserReviewedBy", fields: [reviewedById], references: [id])
+  reviewedUsers User[]      @relation("UserReviewedBy")
+  auditLogs     AuditLog[]
 
   documentsOwned    Document[]         @relation("DocumentOwner")
   documentVersions  DocumentVersion[]  @relation("DocumentVersionUploader")

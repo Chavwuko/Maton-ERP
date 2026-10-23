@@ -293,4 +293,34 @@ describe('Inventory stock engine (e2e)', () => {
     const total = res.body.reduce((sum: number, t: { quantity: number }) => sum + t.quantity, 0);
     expect(Math.round(total * 1000) / 1000).toBe(await onHand());
   });
+
+  it('hides every cost figure from the staff role but not from anyone else', async () => {
+    const created = await keeper.post('/inventory-items').send({
+      organizationId: orgId, sku: 'HX-COST', name: 'Costed', unitOfMeasure: 'pcs', unitCost: 3.5, openingStock: 4, openingWarehouseId: whId,
+    });
+    const staff = asRole(app, 'staff');
+
+    const asAdmin = await admin.get(`/inventory-items/${created.body.id}`);
+    expect(asAdmin.body.unitCost).toBe('3.5');
+
+    const detail = await staff.get(`/inventory-items/${created.body.id}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body).not.toHaveProperty('unitCost');
+    expect(detail.body.sku).toBe('HX-COST');
+
+    const overview = await staff.get(`/inventory-items/overview?organizationId=${orgId}`);
+    const row = overview.body.find((i: { id: string }) => i.id === created.body.id);
+    expect(row.totalOnHand).toBe(4);
+    expect(row).not.toHaveProperty('unitCost');
+    expect(row).not.toHaveProperty('stockValue');
+
+    const purchases = await staff.get(`/purchases?organizationId=${orgId}`);
+    expect(purchases.status).toBe(200);
+    for (const purchase of purchases.body) {
+      expect(purchase).not.toHaveProperty('unitCost');
+      expect(purchase).not.toHaveProperty('total');
+    }
+    // Staff can read stock but still cannot change it.
+    expect((await staff.post('/purchases').send({})).status).toBe(403);
+  });
 });

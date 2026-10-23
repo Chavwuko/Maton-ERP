@@ -50,6 +50,7 @@ describe('RoleProvider', () => {
       email: 'a@b.com',
       roleName: 'maintenance',
       departmentId: null,
+      status: 'ACTIVE', firstName: '', lastName: '', phone: null, rejectionReason: null,
     });
     const user = userEvent.setup();
 
@@ -70,6 +71,7 @@ describe('RoleProvider', () => {
       email: 'a@b.com',
       roleName: null,
       departmentId: null,
+      status: 'ACTIVE', firstName: '', lastName: '', phone: null, rejectionReason: null,
     });
 
     renderWithProviders(<RoleProbe />);

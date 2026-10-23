@@ -13,6 +13,7 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { MaintenanceModule } from './modules/maintenance/maintenance.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { ProjectsModule } from './modules/projects/projects.module';
+import { SettingsModule } from './modules/settings/settings.module';
 import { UsersModule } from './modules/users/users.module';
 import { StorageModule } from './storage/storage.module';
 
@@ -33,6 +34,7 @@ import { StorageModule } from './storage/storage.module';
     HseModule,
     HrModule,
     UsersModule,
+    SettingsModule,
   ],
   controllers: [HealthController],
 })

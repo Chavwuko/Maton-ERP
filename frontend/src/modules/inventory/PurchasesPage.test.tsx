@@ -213,4 +213,14 @@ describe('PurchasesPage', () => {
 
     expect(await screen.findByText('Stock already issued')).toBeInTheDocument();
   });
+
+  it('hides unit cost and totals from the staff role', async () => {
+    setCurrentRole('staff');
+    renderWithProviders(<PurchasesPage />);
+    await screen.findByText('PO-100');
+
+    expect(screen.queryByText('Unit cost')).not.toBeInTheDocument();
+    expect(screen.queryByText('Total')).not.toBeInTheDocument();
+    expect(screen.queryByText('1,197.00')).not.toBeInTheDocument();
+  });
 });
