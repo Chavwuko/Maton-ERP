@@ -1,5 +1,6 @@
 import { afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
+import { notifications } from '@mantine/notifications';
 import '@testing-library/jest-dom/vitest';
 
 // Without vitest's `globals: true`, testing-library can't find a global
@@ -7,6 +8,10 @@ import '@testing-library/jest-dom/vitest';
 // its tree mounted for the next test in the file.
 afterEach(() => {
   cleanup();
+  // Mantine shows at most five toasts and keeps the rest queued in a
+  // module-level store, so toasts left over from earlier tests in a file
+  // can push a later test's toast out of view on a fast runner.
+  notifications.clean();
 });
 
 // Node 22+ ships an experimental native `localStorage` global that, without

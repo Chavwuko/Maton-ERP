@@ -130,7 +130,8 @@ describe('AccessRequestsPanel', () => {
     await user.click(within(row).getByRole('button', { name: 'Approve' }));
     const dialog = await screen.findByRole('dialog', { name: 'Approve ann@acme.test' });
     expect(within(dialog).getByLabelText('Role', { exact: false })).toHaveValue('staff');
-    expect(within(dialog).getByPlaceholderText('Select department')).toHaveValue('Stores');
+    // The department list loads asynchronously, so its name appears a moment later.
+    await waitFor(() => expect(within(dialog).getByPlaceholderText('Select department')).toHaveValue('Stores'));
     await pickOption(user, within(dialog).getByLabelText('Role', { exact: false }), 'inventory');
     await user.click(within(dialog).getByRole('button', { name: 'Approve' }));
 
