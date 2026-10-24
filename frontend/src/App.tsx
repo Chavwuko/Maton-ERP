@@ -18,7 +18,9 @@ import { VendorsListPage } from './modules/accounting/VendorsListPage';
 import { InventoryItemDetailPage } from './modules/inventory/InventoryItemDetailPage';
 import { ConsumptionPage } from './modules/inventory/ConsumptionPage';
 import { InventoryItemsListPage } from './modules/inventory/InventoryItemsListPage';
+import { InventoryDashboardPage } from './modules/inventory/InventoryDashboardPage';
 import { PurchasesPage } from './modules/inventory/PurchasesPage';
+import { ReportsPage } from './modules/inventory/ReportsPage';
 import { StorePage } from './modules/inventory/StorePage';
 import { WarehouseDetailPage } from './modules/inventory/WarehouseDetailPage';
 import { WarehousesListPage } from './modules/inventory/WarehousesListPage';
@@ -53,7 +55,8 @@ export default function App() {
         <Route path="/accounting/invoices/:id" element={<InvoiceDetailPage />} />
         <Route path="/accounting/vendors" element={<VendorsListPage />} />
         <Route path="/accounting/vendors/:id" element={<VendorDetailPage />} />
-        <Route path="/inventory" element={<Navigate to="/inventory/items" replace />} />
+        <Route path="/inventory" element={<InventoryDashboardPage />} />
+        <Route path="/inventory/reports" element={<ReportsPage />} />
         <Route path="/inventory/items" element={<InventoryItemsListPage />} />
         <Route path="/inventory/purchases" element={<PurchasesPage />} />
         <Route path="/inventory/consumption" element={<ConsumptionPage />} />

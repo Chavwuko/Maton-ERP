@@ -26,11 +26,13 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Inventory',
     path: '/inventory',
     children: [
+      { label: 'Dashboard', path: '/inventory', exact: true },
       { label: 'Items', path: '/inventory/items' },
       { label: 'Purchases', path: '/inventory/purchases' },
       { label: 'Consumption', path: '/inventory/consumption' },
       { label: 'Store', path: '/inventory/store' },
       { label: 'Warehouses', path: '/inventory/warehouses' },
+      { label: 'Reports', path: '/inventory/reports' },
     ],
   },
   { label: 'Appointments', path: '/appointments' },

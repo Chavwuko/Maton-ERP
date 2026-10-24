@@ -8,9 +8,11 @@ import { pickOption } from '../../test/pickOption';
 import { setCurrentRole } from '../../auth/roleStore';
 import { ApiError } from '../../api/client';
 import * as usersApi from '../../api/users';
+import * as activityApi from '../../api/activity';
 import { UsersListPage } from './UsersListPage';
 
 vi.mock('../../api/users');
+vi.mock('../../api/activity');
 vi.mock('../../api/settings', () => ({
   getAccessSettings: vi.fn().mockResolvedValue({ openSignup: true, allowedEmailDomains: [] }),
   updateAccessSettings: vi.fn(),
@@ -182,5 +184,46 @@ describe('UsersListPage', () => {
     await user.click(within(row).getByRole('button', { name: 'Disable' }));
 
     expect(await screen.findByText('Failed to change user status')).toBeInTheDocument();
+  });
+
+  describe('tabs follow the URL', () => {
+    beforeEach(() => {
+      vi.mocked(activityApi.listActivity).mockResolvedValue([]);
+    });
+
+    it('opens the tab named in ?tab=', async () => {
+      renderWithProviders(<UsersListPage />, { route: '/users?tab=activity' });
+
+      expect(await screen.findByText('No activity matches.')).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Activity log' })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('opens the access requests tab for the link in the notification bell', async () => {
+      renderWithProviders(<UsersListPage />, { route: '/users?tab=requests' });
+
+      expect(await screen.findByRole('tab', { name: /Access requests/ })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('falls back to the directory for an unknown tab, or one this role may not see', async () => {
+      const { unmount } = renderWithProviders(<UsersListPage />, { route: '/users?tab=bogus' });
+      expect(await screen.findByRole('tab', { name: 'Users' })).toHaveAttribute('aria-selected', 'true');
+      unmount();
+
+      setCurrentRole('inventory');
+      renderWithProviders(<UsersListPage />, { route: '/users?tab=activity' });
+      expect(await screen.findByRole('tab', { name: 'Users' })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.queryByRole('tab', { name: 'Activity log' })).not.toBeInTheDocument();
+    });
+
+    it('switches tabs when clicked', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<UsersListPage />);
+
+      await user.click(await screen.findByRole('tab', { name: 'Activity log' }));
+      expect(await screen.findByText('No activity matches.')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('tab', { name: 'Users' }));
+      expect(screen.getByRole('tab', { name: 'Users' })).toHaveAttribute('aria-selected', 'true');
+    });
   });
 });

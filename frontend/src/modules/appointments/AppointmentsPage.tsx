@@ -1,6 +1,7 @@
 import { Stack, Tabs, Title } from '@mantine/core';
 import { useRole } from '../../auth/RoleContext';
 import { hasRole } from '../../auth/roleStore';
+import { useTabParam } from '../../lib/useTabParam';
 import { AllAppointmentsPanel } from './AllAppointmentsPanel';
 import { BookPanel } from './BookPanel';
 import { MyAppointmentsPanel } from './MyAppointmentsPanel';
@@ -10,12 +11,16 @@ export function AppointmentsPage() {
   const { role } = useRole();
   const isStore = hasRole(role, ['admin', 'inventory']);
   const isAdmin = hasRole(role, ['admin']);
+  const [tab, setTab] = useTabParam(
+    ['book', 'mine', ...(isStore ? ['all'] : []), ...(isAdmin ? ['schedule'] : [])],
+    'book',
+  );
 
   return (
     <Stack>
       <Title order={2}>Appointments</Title>
 
-      <Tabs defaultValue="book">
+      <Tabs value={tab} onChange={setTab}>
         <Tabs.List>
           <Tabs.Tab value="book">Book</Tabs.Tab>
           <Tabs.Tab value="mine">My appointments</Tabs.Tab>

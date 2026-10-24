@@ -292,11 +292,11 @@ user.
   `refType`/`refId`.
 
 Quantities are decimals (rounded to 3 dp) so metres, kilograms and litres
-work; money is 2 dp. The Inventory screens are Items, Purchases,
-Consumption, Store (available stock + stock take, and the ledger) and
-Warehouses. This module was ported from an earlier Google Apps Script store
-system; its self-signup/approval users, appointments, dashboards and reports
-are the next phases.
+work; money is 2 dp. The Inventory screens are Dashboard, Items,
+Purchases, Consumption, Store (available stock + stock take, and the ledger),
+Warehouses and Reports. This module was ported from an earlier Google Apps
+Script store system; see the Users, Appointments, and Dashboard / reports
+sections below for the rest of that port.
 
 `StockLevel.quantityOnHand` is a denormalized cache of the `StockTransaction`
 ledger, kept in sync by `InventoryService`'s private `applyStockDelta` —
@@ -346,6 +346,48 @@ appointment is `PENDING` or `APPROVED`.
 **My appointments** (with cancel), **All appointments** (admin/inventory:
 filters and a Review dialog that prefills the requested items with the
 on-hand quantity beside each) and **Schedule** (admin).
+
+## Dashboard, reports, activity log and notifications
+
+The last pieces ported from the old store system.
+
+**Inventory dashboard** — `GET /dashboard/inventory` (any signed-in user) and
+the page at `/inventory`. Admin, inventory, finance and viewer get the
+store-wide picture: items, stock value, low/out-of-stock counts, purchases and
+issues this month, six months of purchases vs issues, stock value by category,
+most-consumed items and issues by department (last 90 days), stock alerts,
+upcoming appointments and recent movements. Admin also sees how many sign-up
+requests are waiting. Everyone else gets a dashboard about their own
+appointments (counts by status, what is coming up, the store's feedback).
+"This month" and "today" use the appointment schedule's time zone.
+
+**Reports** — `GET /reports/inventory` (`from?`, `to?`; admin, inventory,
+finance, viewer) totals purchases and issues, with spend by supplier, cost by
+project and by department, the top 25 items by cost, and stock value by
+category. `GET /reports/inventory/csv?type=` downloads one as CSV: `suppliers`,
+`projects`, `departments`, `items`, `valuation`, `stock`, `purchases`,
+`consumption` (the last three are full line lists, not summaries). Files carry
+a byte-order mark so Excel reads accents correctly, and text cells that start
+with `=`, `+`, `-` or `@` get a leading apostrophe so a hostile item name
+cannot run as a spreadsheet formula. The page is at `/inventory/reports`.
+
+**Activity log** — `GET /activity` (admin only; `userId?`, `action?`,
+`entityType?`, `from?`, `to?`, `limit?` up to 500, default 200). A global
+`ActivityLogInterceptor` records every *successful* change request
+(POST/PUT/PATCH/DELETE) in the existing `audit_logs` table, so nothing has to
+remember to log: who did it, what, which record, and a short summary. Known
+routes have friendly names and summaries (`PURCHASE`, `ISSUE`,
+`STOCK_ADJUST`, `APPOINTMENT_COMPLETED`, `ACCESS_APPROVED`, ...) defined in
+`modules/activity/activity-labels.ts`; any other change is still logged under
+its route (e.g. `PATCH /shifts/:id`). Reads and failed requests are not
+logged, and a failure to write the log never fails the request. It is shown
+on **Users -> Activity log**.
+
+**Notifications** — `GET /notifications` (admin, inventory) feeds the bell in
+the header: sign-up requests waiting (admin only) and appointments waiting for
+review, each linking to the right tab (`/users?tab=requests`,
+`/appointments?tab=all`; pages keep their selected tab in the URL). The bell
+refreshes every minute. It is in-app only — email is on the Roadmap.
 
 ## Accounting module
 

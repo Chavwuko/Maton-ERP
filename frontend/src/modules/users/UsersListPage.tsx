@@ -8,6 +8,8 @@ import { disableUser, enableUser, listUsers, updateUser } from '../../api/users'
 import { useRole } from '../../auth/RoleContext';
 import { hasRole, ROLES } from '../../auth/roleStore';
 import { DepartmentSelect } from '../../components/DepartmentSelect';
+import { useTabParam } from '../../lib/useTabParam';
+import { ActivityPanel } from './ActivityPanel';
 import { AccessRequestsPanel } from './AccessRequestsPanel';
 import { AccessSettingsPanel } from './AccessSettingsPanel';
 import { USER_STATUS_COLORS, USER_STATUS_LABELS, type User } from './types';
@@ -160,6 +162,7 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
 export function UsersListPage() {
   const { role } = useRole();
   const isAdmin = hasRole(role, ['admin']);
+  const [tab, setTab] = useTabParam(['users', ...(isAdmin ? ['requests', 'settings', 'activity'] : [])], 'users');
 
   // Same query the requests tab runs, so the badge and the tab agree.
   const { data: pending } = useQuery({
@@ -172,7 +175,7 @@ export function UsersListPage() {
     <Stack>
       <Title order={2}>Users</Title>
 
-      <Tabs defaultValue="users">
+      <Tabs value={tab} onChange={setTab}>
         <Tabs.List>
           <Tabs.Tab value="users">Users</Tabs.Tab>
           {isAdmin && (
@@ -190,6 +193,7 @@ export function UsersListPage() {
             </Tabs.Tab>
           )}
           {isAdmin && <Tabs.Tab value="settings">Sign-up settings</Tabs.Tab>}
+          {isAdmin && <Tabs.Tab value="activity">Activity log</Tabs.Tab>}
         </Tabs.List>
 
         <Tabs.Panel value="users" pt="md">
@@ -203,6 +207,11 @@ export function UsersListPage() {
         {isAdmin && (
           <Tabs.Panel value="settings" pt="md">
             <AccessSettingsPanel />
+          </Tabs.Panel>
+        )}
+        {isAdmin && (
+          <Tabs.Panel value="activity" pt="md">
+            <ActivityPanel />
           </Tabs.Panel>
         )}
       </Tabs>

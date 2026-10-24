@@ -26,14 +26,30 @@ describe('AppNav', () => {
     expect(employeesLink).toHaveAttribute('data-active', 'true');
   });
 
-  it('expands Inventory into Items, Purchases, Consumption, Store and Warehouses and highlights the current one', () => {
+  it('expands Inventory into Dashboard, Items, Purchases, Consumption, Store, Warehouses and Reports and highlights the current one', () => {
     renderWithProviders(<AppNav />, { route: '/inventory/purchases' });
 
     expect(screen.getByRole('link', { name: 'Items' })).toHaveAttribute('href', '/inventory/items');
+    expect(screen.getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/inventory/reports');
     expect(screen.getByRole('link', { name: 'Consumption' })).toHaveAttribute('href', '/inventory/consumption');
     expect(screen.getByRole('link', { name: 'Store' })).toHaveAttribute('href', '/inventory/store');
     expect(screen.getByRole('link', { name: 'Warehouses' })).toHaveAttribute('href', '/inventory/warehouses');
     expect(screen.getByRole('link', { name: 'Purchases' })).toHaveAttribute('data-active', 'true');
     expect(screen.getByRole('link', { name: 'Items' })).not.toHaveAttribute('data-active', 'true');
+  });
+
+  it('lights up the Inventory Dashboard only on its own page, not on every Inventory page', () => {
+    renderWithProviders(<AppNav />, { route: '/inventory' });
+
+    const dashboard = screen.getAllByRole('link', { name: 'Dashboard' });
+    expect(dashboard.some((link) => link.getAttribute('href') === '/inventory' && link.getAttribute('data-active') === 'true')).toBe(true);
+    expect(screen.getByRole('link', { name: 'Items' })).not.toHaveAttribute('data-active', 'true');
+  });
+
+  it('lists Appointments as its own entry', () => {
+    renderWithProviders(<AppNav />, { route: '/appointments' });
+
+    expect(screen.getByRole('link', { name: 'Appointments' })).toHaveAttribute('href', '/appointments');
+    expect(screen.getByRole('link', { name: 'Appointments' })).toHaveAttribute('data-active', 'true');
   });
 });

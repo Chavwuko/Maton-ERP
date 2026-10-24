@@ -168,4 +168,33 @@ describe('apiClient', () => {
       message: 'Request failed with status 502',
     });
   });
+
+  it('download returns the file text and the filename the server suggests', async () => {
+    vi.mocked(fetch).mockImplementation(() =>
+      Promise.resolve(
+        new Response('a,b\r\n1,2', { headers: { 'Content-Disposition': 'attachment; filename="suppliers-2026-10-01.csv"' } }),
+      ),
+    );
+    const { apiClient } = await import('./client');
+
+    await expect(apiClient.download('/reports/inventory/csv?type=suppliers')).resolves.toEqual({
+      filename: 'suppliers-2026-10-01.csv',
+      text: 'a,b\r\n1,2',
+    });
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    expect(url).toBe('http://localhost:3000/reports/inventory/csv?type=suppliers');
+    expect((init?.headers as Record<string, string>)['x-local-role']).toBe('admin');
+  });
+
+  it('download falls back to a generic filename, and raises the API error on failure', async () => {
+    vi.mocked(fetch).mockImplementationOnce(() => Promise.resolve(new Response('x')));
+    const { apiClient, ApiError } = await import('./client');
+
+    await expect(apiClient.download('/x')).resolves.toMatchObject({ filename: 'download.csv' });
+
+    vi.mocked(fetch).mockImplementationOnce(() =>
+      Promise.resolve(jsonResponse({ message: 'type must be one of: suppliers' }, { status: 400 })),
+    );
+    await expect(apiClient.download('/x')).rejects.toBeInstanceOf(ApiError);
+  });
 });

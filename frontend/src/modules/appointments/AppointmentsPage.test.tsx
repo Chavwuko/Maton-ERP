@@ -65,4 +65,30 @@ describe('appointment helpers', () => {
     expect(personName({ firstName: 'Ann', lastName: 'Store', email: 'ann@acme.test' })).toBe('Ann Store');
     expect(personName({ firstName: '', lastName: '', email: 'ann@acme.test' })).toBe('ann@acme.test');
   });
+
+  describe('tabs follow the URL', () => {
+    it('opens All appointments for the notification bell link', async () => {
+      setCurrentRole('inventory');
+      renderWithProviders(<AppointmentsPage />, { route: '/appointments?tab=all' });
+
+      expect(await screen.findByRole('tab', { name: 'All appointments' })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('falls back to Book when this role cannot see the tab', () => {
+      setCurrentRole('staff');
+      renderWithProviders(<AppointmentsPage />, { route: '/appointments?tab=all' });
+
+      expect(screen.getByRole('tab', { name: 'Book' })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('switches tabs when clicked', async () => {
+      const user = (await import('@testing-library/user-event')).default.setup();
+      setCurrentRole('admin');
+      renderWithProviders(<AppointmentsPage />);
+
+      await user.click(screen.getByRole('tab', { name: 'My appointments' }));
+
+      expect(screen.getByRole('tab', { name: 'My appointments' })).toHaveAttribute('aria-selected', 'true');
+    });
+  });
 });
