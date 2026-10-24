@@ -85,29 +85,33 @@ describe('Activity, notifications, dashboard and reports (e2e)', () => {
       expect(entry.entityId).toBeTruthy();
     });
 
-    it('records issues, filtered by type, user and date', async () => {
+    it('records issues, filtered by record kind, action, user and date', async () => {
       const today = new Date().toISOString().slice(0, 10);
       const rows = await eventually<Rows>(
-        async () => (await admin.get('/activity').query({ entityType: 'Consumption', from: today, to: today })).body,
-        (found) => found.length > 0,
+        async () => (await admin.get('/activity').query({ entityType: 'Consumption', from: today, to: today, limit: 500 })).body,
+        (found) => found.some((r) => r.action === 'ISSUE'),
       );
 
-      expect(rows.length).toBeGreaterThan(0);
-      expect(rows.every((r) => r.action === 'ISSUE')).toBe(true);
-      const user = rows[0].user;
-      const byUser = await admin.get('/activity').query({ userId: user.id, action: 'ISSUE' });
-      expect(byUser.body.every((r: { user: { id: string } }) => r.user.id === user.id)).toBe(true);
+      // Other suites reverse issues too, so Consumption holds more than ISSUE.
+      expect(rows.every((r) => r.entityType === 'Consumption')).toBe(true);
+      const issue = rows.find((r) => r.action === 'ISSUE')!;
+      const byAction = await admin.get('/activity').query({ action: 'ISSUE', limit: 500 });
+      expect(byAction.body.length).toBeGreaterThan(0);
+      expect(byAction.body.every((r: Rows[number]) => r.action === 'ISSUE')).toBe(true);
+      const byUser = await admin.get('/activity').query({ userId: issue.user.id, action: 'ISSUE', limit: 500 });
+      expect(byUser.body.every((r: Rows[number]) => r.user.id === issue.user.id)).toBe(true);
     });
 
     it('does not record reads or failed requests', async () => {
-      const before = (await admin.get('/activity').query({ action: 'CATEGORY_CREATE', limit: 500 })).body.length;
-
       await admin.get('/item-categories');
       const blank = await keeper.post('/item-categories').send({ organizationId: orgId, name: '  ' });
       expect(blank.status).toBe(400);
       await new Promise((resolve) => setTimeout(resolve, 400));
 
-      expect((await admin.get('/activity').query({ action: 'CATEGORY_CREATE', limit: 500 })).body.length).toBe(before);
+      const all: Rows = (await admin.get('/activity').query({ limit: 500 })).body;
+      // A request that failed or only read would have no record id behind it.
+      expect(all.some((r) => r.action === 'CATEGORY_CREATE' && r.entityId === '')).toBe(false);
+      expect(all.some((r) => r.metadata?.method === 'GET')).toBe(false);
     });
 
     it('logs changes with no label under their route', async () => {
