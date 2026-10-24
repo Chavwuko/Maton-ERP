@@ -497,7 +497,14 @@ export class InventoryService {
 
   // Issues stock out of a warehouse, charged to a department and/or project
   // at the item's current weighted-average cost. Stock never goes negative.
-  async recordConsumption(dto: CreateConsumptionDto, issuedById: string) {
+  recordConsumption(dto: CreateConsumptionDto, issuedById: string) {
+    return this.prisma.$transaction((tx) => this.issueStock(tx, dto, issuedById));
+  }
+
+  // The one place stock leaves a warehouse as a costed issue. Takes the
+  // caller's transaction so other workflows (an appointment being completed)
+  // can issue several lines atomically with their own updates.
+  async issueStock(tx: Prisma.TransactionClient, dto: CreateConsumptionDto, issuedById: string, appointmentId?: string) {
     const quantity = round3(dto.quantity);
     if (!(quantity > 0)) {
       throw new BadRequestException('quantity must be positive');
@@ -506,50 +513,49 @@ export class InventoryService {
       throw new BadRequestException('Select a department or a project / job to charge the items to');
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const item = await tx.inventoryItem.findUnique({ where: { id: dto.itemId } });
-      if (!item || item.deletedAt) throw new NotFoundException(`Inventory item ${dto.itemId} not found`);
-      if (dto.departmentId && !(await tx.department.findUnique({ where: { id: dto.departmentId } }))) {
-        throw new NotFoundException(`Department ${dto.departmentId} not found`);
-      }
-      if (dto.projectId && !(await tx.project.findUnique({ where: { id: dto.projectId } }))) {
-        throw new NotFoundException(`Project ${dto.projectId} not found`);
-      }
+    const item = await tx.inventoryItem.findUnique({ where: { id: dto.itemId } });
+    if (!item || item.deletedAt) throw new NotFoundException(`Inventory item ${dto.itemId} not found`);
+    if (dto.departmentId && !(await tx.department.findUnique({ where: { id: dto.departmentId } }))) {
+      throw new NotFoundException(`Department ${dto.departmentId} not found`);
+    }
+    if (dto.projectId && !(await tx.project.findUnique({ where: { id: dto.projectId } }))) {
+      throw new NotFoundException(`Project ${dto.projectId} not found`);
+    }
 
-      const balance = await this.applyStockDelta(tx, item.id, dto.warehouseId, -quantity);
-      const cost = money(item.unitCost);
+    const balance = await this.applyStockDelta(tx, item.id, dto.warehouseId, -quantity);
+    const cost = money(item.unitCost);
 
-      const consumption = await tx.consumption.create({
-        data: {
-          organizationId: item.organizationId,
-          warehouseId: dto.warehouseId,
-          itemId: item.id,
-          date: dto.date ? new Date(dto.date) : new Date(),
-          quantity,
-          unitCost: cost,
-          total: cost.times(quantity).toDecimalPlaces(2),
-          departmentId: dto.departmentId,
-          projectId: dto.projectId,
-          issuedTo: dto.issuedTo,
-          purpose: dto.purpose,
-          issuedById,
-        },
-      });
-      await tx.stockTransaction.create({
-        data: {
-          itemId: item.id,
-          warehouseId: dto.warehouseId,
-          type: 'ISSUE',
-          quantity: -quantity,
-          balanceAfter: balance,
-          refType: 'CONSUMPTION',
-          refId: consumption.id,
-          notes: dto.purpose || 'Issued',
-          performedById: issuedById,
-        },
-      });
-      return consumption;
+    const consumption = await tx.consumption.create({
+      data: {
+        organizationId: item.organizationId,
+        warehouseId: dto.warehouseId,
+        itemId: item.id,
+        date: dto.date ? new Date(dto.date) : new Date(),
+        quantity,
+        unitCost: cost,
+        total: cost.times(quantity).toDecimalPlaces(2),
+        departmentId: dto.departmentId,
+        projectId: dto.projectId,
+        issuedTo: dto.issuedTo,
+        purpose: dto.purpose,
+        issuedById,
+        appointmentId,
+      },
     });
+    await tx.stockTransaction.create({
+      data: {
+        itemId: item.id,
+        warehouseId: dto.warehouseId,
+        type: 'ISSUE',
+        quantity: -quantity,
+        balanceAfter: balance,
+        refType: 'CONSUMPTION',
+        refId: consumption.id,
+        notes: dto.purpose || 'Issued',
+        performedById: issuedById,
+      },
+    });
+    return consumption;
   }
 
   async deleteConsumption(id: string, performedById: string) {

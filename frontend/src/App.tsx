@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { OrganizationDetailPage } from './modules/organizations/OrganizationDetailPage';
 import { OrganizationsListPage } from './modules/organizations/OrganizationsListPage';
+import { AppointmentsPage } from './modules/appointments/AppointmentsPage';
 import { AssetDetailPage } from './modules/assets/AssetDetailPage';
 import { AssetsListPage } from './modules/assets/AssetsListPage';
 import { MaintenanceDetailPage } from './modules/maintenance/MaintenanceDetailPage';
@@ -60,6 +61,7 @@ export default function App() {
         <Route path="/inventory/items/:id" element={<InventoryItemDetailPage />} />
         <Route path="/inventory/warehouses" element={<WarehousesListPage />} />
         <Route path="/inventory/warehouses/:id" element={<WarehouseDetailPage />} />
+        <Route path="/appointments" element={<AppointmentsPage />} />
         <Route path="/hr" element={<HRDashboardPage />} />
         <Route path="/hr/employees" element={<EmployeesListPage />} />
         <Route path="/hr/employees/:id" element={<EmployeeDetailPage />} />

@@ -53,6 +53,7 @@ model Department {
   users        User[]
   documents    Document[]
   consumptions Consumption[]
+  appointments Appointment[]
 
   @@unique([organizationId, code])
   @@map("departments")
@@ -120,8 +121,10 @@ model User {
 
   expenseRequestsDecided ExpenseRequest[] @relation("ExpenseRequestDecidedBy")
 
-  purchasesReceived  Purchase[]    @relation("PurchaseReceivedBy")
-  consumptionsIssued Consumption[] @relation("ConsumptionIssuedBy")
+  purchasesReceived     Purchase[]    @relation("PurchaseReceivedBy")
+  consumptionsIssued    Consumption[] @relation("ConsumptionIssuedBy")
+  appointmentsRequested Appointment[] @relation("AppointmentRequester")
+  appointmentsReviewed  Appointment[] @relation("AppointmentFeedbackBy")
 
   // One HR record per employed user. Optional because not every
   // Cognito-authenticated User is necessarily an onboarded employee
@@ -482,12 +485,13 @@ model InventoryItem {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  organization Organization       @relation(fields: [organizationId], references: [id])
-  category     ItemCategory?      @relation(fields: [categoryId], references: [id])
-  stockLevels  StockLevel[]
-  transactions StockTransaction[]
-  purchases    Purchase[]
-  consumptions Consumption[]
+  organization     Organization       @relation(fields: [organizationId], references: [id])
+  category         ItemCategory?      @relation(fields: [categoryId], references: [id])
+  stockLevels      StockLevel[]
+  transactions     StockTransaction[]
+  purchases        Purchase[]
+  consumptions     Consumption[]
+  appointmentItems AppointmentItem[]
 
   @@unique([organizationId, sku])
   @@map("inventory_items")
@@ -614,6 +618,8 @@ model Consumption {
   issuedTo       String?
   purpose        String?
   issuedById     String
+  // Set when the issue happened because an appointment was completed.
+  appointmentId  String?
   deletedAt      DateTime?
   createdAt      DateTime  @default(now())
 
@@ -623,9 +629,63 @@ model Consumption {
   project      Project?      @relation(fields: [projectId], references: [id])
   department   Department?   @relation(fields: [departmentId], references: [id])
   issuedBy     User          @relation("ConsumptionIssuedBy", fields: [issuedById], references: [id])
+  appointment  Appointment?  @relation(fields: [appointmentId], references: [id])
 
   @@index([organizationId, date])
   @@map("consumptions")
+}
+
+// A booked slot with the store: someone asks to collect items or meet the
+// store team, and an admin/inventory user approves, declines or completes it.
+// Completing can issue stock (see AppointmentsService.review), which creates
+// Consumption rows tagged with this appointment.
+enum AppointmentStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  COMPLETED
+  CANCELLED
+}
+
+model Appointment {
+  id           String            @id @default(uuid())
+  requesterId  String
+  departmentId String?
+  date         DateTime          @db.Date
+  time         String // "HH:MM", the slot's start in the schedule's time zone
+  type         String
+  subject      String
+  details      String?
+  status       AppointmentStatus @default(PENDING)
+  feedback     String?
+  feedbackById String?
+  feedbackAt   DateTime?
+  issuedNote   String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  requester    User              @relation("AppointmentRequester", fields: [requesterId], references: [id])
+  feedbackBy   User?             @relation("AppointmentFeedbackBy", fields: [feedbackById], references: [id])
+  department   Department?       @relation(fields: [departmentId], references: [id])
+  items        AppointmentItem[]
+  consumptions Consumption[]
+
+  @@index([date, time])
+  @@index([requesterId])
+  @@map("appointments")
+}
+
+model AppointmentItem {
+  id            String @id @default(uuid())
+  appointmentId String
+  itemId        String
+  quantity      Float
+
+  appointment Appointment   @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  item        InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@unique([appointmentId, itemId])
+  @@map("appointment_items")
 }
 
 // ---------------------------------------------------------------------------

@@ -56,6 +56,7 @@ const consumption: Consumption = {
   issuedTo: 'Joe Fitter',
   purpose: 'Pump rebuild',
   issuedById: 'user-1',
+  appointmentId: null,
   createdAt: '2026-03-06T00:00:00.000Z',
   item,
   project: { id: 'proj-1', code: 'P-01', name: 'Plant upgrade' },

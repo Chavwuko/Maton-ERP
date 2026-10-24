@@ -109,6 +109,8 @@ export interface Consumption {
   issuedTo: string | null;
   purpose: string | null;
   issuedById: string;
+  // Set when the issue came from completing an appointment.
+  appointmentId: string | null;
   createdAt: string;
   item?: InventoryItem;
   project?: { id: string; code: string; name: string } | null;

@@ -303,6 +303,50 @@ ledger, kept in sync by `InventoryService`'s private `applyStockDelta` —
 never write it directly from a new endpoint; go through
 `recordTransaction`/`transfer` (or extend them) so the two can't drift.
 
+## Appointments module
+
+Anyone signed in can book a slot with the store and list the items they need;
+admin/inventory (the people who run the store) approve, decline or complete
+each request, and completing it can hand over the items. It was ported from
+the old store system's appointment booking.
+
+An appointment moves `PENDING` -> `APPROVED` / `DECLINED` / `COMPLETED`, or
+`CANCELLED` by the requester or the store. A slot is taken while an
+appointment is `PENDING` or `APPROVED`.
+
+- `GET /appointments/schedule` (anyone), `PUT /appointments/schedule` (admin;
+  `workStart`, `workEnd`, `slotMinutes` 10-240 in steps of 5, `slotCapacity`
+  1-50 appointments at once, `workingDays` 0=Sunday..6, `timeZone`) — stored
+  in `app_settings`. Defaults: 08:00-17:00, 30-minute slots, one at a time,
+  Monday-Friday, `Africa/Lagos`. Slots and the "is it in the past" check are
+  judged on the clock in that zone, not the server's.
+- `GET /appointments/slots?date=YYYY-MM-DD` — every slot of the day with
+  `booked`, `capacity` and `available` (false when full or already past);
+  `working: false` on a non-working day.
+- `POST /appointments` (body: `date`, `time` — must be the start of a slot —
+  `subject`, `type?`, `details?`, `items?: [{ itemId, quantity }]`) — the
+  requester is the signed-in user, and their department comes from their own
+  record. Refused for a past slot, a non-working day, a full slot, or a second
+  booking by the same person at the same time. Repeated items are merged.
+- `GET /appointments/mine`; `GET /appointments` (admin/inventory; `status?`,
+  `from?`, `to?`).
+- `POST /appointments/:id/cancel` — the requester, or admin/inventory.
+- `POST /appointments/:id/review` (admin/inventory; body: `decision`
+  `APPROVED`/`DECLINED`/`COMPLETED`, `feedback?`, and for completing
+  `warehouseId?`, `projectId?`, `issue?: [{ itemId, quantity }]`). Declining
+  or completing needs feedback. Completing issues each `issue` line through
+  `InventoryService.issueStock` in the **same transaction** as the status
+  change, charged to the requester's department (or `projectId` when they have
+  none), so a shortage leaves both the appointment and the stock untouched.
+  Each resulting `Consumption` row carries `appointmentId`, and its purpose is
+  the appointment's subject. Two people completing the same appointment at
+  once cannot issue the stock twice (409 for the second).
+
+**Frontend**: `/appointments` has **Book** (date, slot buttons, items),
+**My appointments** (with cancel), **All appointments** (admin/inventory:
+filters and a Review dialog that prefills the requested items with the
+on-hand quantity beside each) and **Schedule** (admin).
+
 ## Accounting module
 
 Vendors, invoices (accounts payable or receivable), and payments against
@@ -987,9 +1031,12 @@ Standing list of planned work — not yet started unless noted otherwise.
 - **HR dashboard visual redesign** to match a specific sketched layout the
   user will provide (current `HRDashboardPage` layout — stat card row +
   chart grid — is a first pass, not the intended final design).
-- **Email notifications on access decisions** (to-do): when an admin
-  approves or rejects a sign-up (`UsersService.approve` / `reject`), email
-  the person — approval with their role, rejection with the reason. There is
+- **Email notifications** (to-do): when an admin approves or rejects a
+  sign-up (`UsersService.approve` / `reject`), email the person — approval
+  with their role, rejection with the reason. The same applies to
+  appointments: email store staff when one is booked or cancelled, and the
+  requester when it is approved, declined, completed or cancelled
+  (`AppointmentsService`). There is
   no email service in the backend yet (the old store system sent these via
   Apps Script); this needs one (e.g. SES, in step with the Cognito/AWS setup)
   plus templates. The same service would later carry an email to admins when

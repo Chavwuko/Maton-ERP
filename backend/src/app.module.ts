@@ -4,6 +4,7 @@ import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthController } from './health/health.controller';
 import { AccountingModule } from './modules/accounting/accounting.module';
+import { AppointmentsModule } from './modules/appointments/appointments.module';
 import { AssetsModule } from './modules/assets/assets.module';
 import { DepartmentsModule } from './modules/departments/departments.module';
 import { DocumentControlModule } from './modules/document-control/document-control.module';
@@ -30,6 +31,7 @@ import { StorageModule } from './storage/storage.module';
     AssetsModule,
     MaintenanceModule,
     InventoryModule,
+    AppointmentsModule,
     AccountingModule,
     HseModule,
     HrModule,
