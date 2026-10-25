@@ -1,5 +1,6 @@
 import type { Session } from '../api/auth';
 import type { Appointment } from '../modules/appointments/types';
+import type { Asset, AssetAssignment } from '../modules/assets/types';
 import type { User } from '../modules/users/types';
 
 export function makeSession(overrides: Partial<Session> = {}): Session {
@@ -67,3 +68,53 @@ export function makeAppointment(overrides: Partial<Appointment> = {}): Appointme
     ...overrides,
   };
 }
+
+export function makeAsset(overrides: Partial<Asset> = {}): Asset {
+  return {
+    id: 'asset-1',
+    organizationId: 'org-1',
+    projectId: null,
+    assetTag: 'PUMP-001',
+    name: 'Feed Pump A',
+    category: 'Rotating',
+    status: 'ACTIVE',
+    location: 'Bay 3',
+    serialNumber: 'SN-100',
+    make: 'Grundfos',
+    model: 'CR-45',
+    purchaseDate: '2026-01-15T00:00:00.000Z',
+    purchaseCost: '1500.50',
+    vendorId: 'ven-1',
+    warrantyExpiry: '2028-01-15T00:00:00.000Z',
+    condition: 'GOOD',
+    notes: null,
+    departmentId: 'dept-1',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    vendor: { id: 'ven-1', name: 'Apex Supplies' },
+    department: { id: 'dept-1', name: 'Plant' },
+    currentAssignment: null,
+    workOrders: [],
+    ...overrides,
+  };
+}
+
+export function makeAssignment(overrides: Partial<AssetAssignment> = {}): AssetAssignment {
+  return {
+    id: 'asg-1',
+    assetId: 'asset-1',
+    assigneeId: 'u-ann',
+    departmentId: null,
+    assignedAt: '2026-10-20T09:00:00.000Z',
+    expectedReturn: '2026-12-01T00:00:00.000Z',
+    returnedAt: null,
+    conditionOut: 'GOOD',
+    conditionIn: null,
+    notes: null,
+    returnNotes: null,
+    assignee: { id: 'u-ann', firstName: 'Ann', lastName: 'Store', email: 'ann@acme.test' },
+    department: null,
+    ...overrides,
+  };
+}
+

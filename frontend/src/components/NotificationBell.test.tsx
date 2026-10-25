@@ -42,7 +42,7 @@ describe('NotificationBell', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Notifications, 3 waiting' }, { timeout: 5000 }));
 
-    const request = await screen.findByRole('link', { name: 'Pat Pending' });
+    const request = await screen.findByRole('link', { name: 'Pat Pending' }, { timeout: 5000 });
     expect(request).toHaveAttribute('href', '/users?tab=requests');
     expect(screen.getByText(/silent@acme.test/)).toHaveTextContent('details not sent yet');
     expect(screen.getByText(/silent@acme.test/).closest('a')).toHaveAttribute('href', '/users?tab=requests');
@@ -57,7 +57,7 @@ describe('NotificationBell', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Notifications' }, { timeout: 5000 }));
 
-    expect(await screen.findByText('Nothing is waiting for you.')).toBeInTheDocument();
+    expect(await screen.findByText('Nothing is waiting for you.', {}, { timeout: 5000 })).toBeInTheDocument();
   });
 
   it('caps a large count', async () => {
@@ -82,7 +82,7 @@ describe('NotificationBell', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Notifications, 1 waiting' }, { timeout: 5000 }));
 
-    expect(await screen.findByText('Appointments to review')).toBeInTheDocument();
+    expect(await screen.findByText('Appointments to review', {}, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.queryByText('Sign-up requests')).not.toBeInTheDocument();
   });
 

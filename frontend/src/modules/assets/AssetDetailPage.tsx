@@ -1,14 +1,24 @@
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Anchor, Group, Loader, Stack, Table, Title } from '@mantine/core';
+import { Alert, Anchor, Badge, Button, Group, Loader, Paper, Stack, Table, Text, Title } from '@mantine/core';
 import { ApiError } from '../../api/client';
-import { getAsset } from '../../api/assets';
+import { getAsset, getAssetHistory, listAssetAssignments } from '../../api/assets';
 import { StatusBadge } from '../../components/StatusBadge';
+import { useRole } from '../../auth/RoleContext';
+import { hasRole } from '../../auth/roleStore';
+import { formatMoney } from '../inventory/format';
 import { WORK_ORDER_STATUS_COLORS } from '../maintenance/types';
-import { ASSET_STATUS_COLORS } from './types';
+import { CheckInDialog, CheckOutDialog, EditAssetDialog } from './AssetDialogs';
+import { ASSET_CONDITION_COLORS, ASSET_STATUS_COLORS, assetDate, holderName } from './types';
+
+type Dialog = 'edit' | 'check-out' | 'check-in' | null;
 
 export function AssetDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { role } = useRole();
+  const [dialog, setDialog] = useState<Dialog>(null);
+  const canManage = hasRole(role, ['admin', 'maintenance']);
 
   const {
     data: asset,
@@ -21,6 +31,18 @@ export function AssetDetailPage() {
     enabled: !!id,
   });
 
+  const { data: custody } = useQuery({
+    queryKey: ['assets', id, 'assignments'],
+    queryFn: () => listAssetAssignments(id!),
+    enabled: !!id,
+  });
+
+  const { data: history } = useQuery({
+    queryKey: ['assets', id, 'history'],
+    queryFn: () => getAssetHistory(id!),
+    enabled: !!id && canManage,
+  });
+
   if (isLoading) return <Loader />;
   if (isError) {
     return (
@@ -31,6 +53,20 @@ export function AssetDetailPage() {
   }
   if (!asset) return null;
 
+  const held = asset.currentAssignment;
+  const details: [string, React.ReactNode][] = [
+    ['Category', asset.category],
+    ['Location', asset.location ?? '—'],
+    ['Owning department', asset.department?.name ?? '—'],
+    ['Make / model', [asset.make, asset.model].filter(Boolean).join(' ') || '—'],
+    ['Serial number', asset.serialNumber ?? '—'],
+    ['Purchased', assetDate(asset.purchaseDate)],
+    ...(asset.purchaseCost === undefined ? [] : ([['Purchase cost', asset.purchaseCost == null ? '—' : formatMoney(asset.purchaseCost)]] as [string, React.ReactNode][])),
+    ['Supplier', asset.vendor?.name ?? '—'],
+    ['Warranty expires', assetDate(asset.warrantyExpiry)],
+    ['Notes', asset.notes ?? '—'],
+  ];
+
   return (
     <Stack>
       <div>
@@ -40,22 +76,90 @@ export function AssetDetailPage() {
       </div>
 
       <Group justify="space-between">
-        <Title order={2}>
-          {asset.assetTag} — {asset.name}
-        </Title>
-        <StatusBadge status={asset.status} colors={ASSET_STATUS_COLORS} />
+        <Group>
+          <Title order={2}>
+            {asset.assetTag} — {asset.name}
+          </Title>
+          <StatusBadge status={asset.status} colors={ASSET_STATUS_COLORS} />
+          <Badge color={ASSET_CONDITION_COLORS[asset.condition]} variant="light">
+            {asset.condition}
+          </Badge>
+        </Group>
+        {canManage && (
+          <Group>
+            <Button variant="light" size="xs" onClick={() => setDialog('edit')}>
+              Edit
+            </Button>
+            {held ? (
+              <Button size="xs" onClick={() => setDialog('check-in')}>
+                Check in
+              </Button>
+            ) : (
+              asset.status === 'ACTIVE' && (
+                <Button size="xs" onClick={() => setDialog('check-out')}>
+                  Check out
+                </Button>
+              )
+            )}
+          </Group>
+        )}
       </Group>
+
+      <Paper withBorder p="md" radius="md">
+        {held ? (
+          <Stack gap={2}>
+            <Text fw={600}>Held by {holderName(held)}</Text>
+            <Text size="sm" c="dimmed">
+              Since {new Date(held.assignedAt).toLocaleDateString()}
+              {held.expectedReturn && ` · expected back ${assetDate(held.expectedReturn)}`}
+              {` · condition when taken: ${held.conditionOut}`}
+            </Text>
+            {held.notes && <Text size="sm">{held.notes}</Text>}
+          </Stack>
+        ) : (
+          <Text c="dimmed">Not checked out.</Text>
+        )}
+      </Paper>
 
       <Table>
         <Table.Tbody>
+          {details.map(([label, value]) => (
+            <Table.Tr key={label}>
+              <Table.Th w={200}>{label}</Table.Th>
+              <Table.Td>{value}</Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+
+      <Title order={4}>Custody history</Title>
+      <Table striped highlightOnHover>
+        <Table.Thead>
           <Table.Tr>
-            <Table.Th>Category</Table.Th>
-            <Table.Td>{asset.category}</Table.Td>
+            <Table.Th>Held by</Table.Th>
+            <Table.Th>From</Table.Th>
+            <Table.Th>Returned</Table.Th>
+            <Table.Th>Condition out → in</Table.Th>
+            <Table.Th>Notes</Table.Th>
           </Table.Tr>
-          <Table.Tr>
-            <Table.Th>Location</Table.Th>
-            <Table.Td>{asset.location ?? '—'}</Table.Td>
-          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {(custody ?? []).map((assignment) => (
+            <Table.Tr key={assignment.id}>
+              <Table.Td>{holderName(assignment)}</Table.Td>
+              <Table.Td>{new Date(assignment.assignedAt).toLocaleDateString()}</Table.Td>
+              <Table.Td>{assignment.returnedAt ? new Date(assignment.returnedAt).toLocaleDateString() : 'Still out'}</Table.Td>
+              <Table.Td>
+                {assignment.conditionOut} → {assignment.conditionIn ?? '—'}
+              </Table.Td>
+              <Table.Td>{[assignment.notes, assignment.returnNotes].filter(Boolean).join(' · ') || '—'}</Table.Td>
+            </Table.Tr>
+          ))}
+          {(custody ?? []).length === 0 && (
+            <Table.Tr>
+              <Table.Td colSpan={5}>Never checked out.</Table.Td>
+            </Table.Tr>
+          )}
         </Table.Tbody>
       </Table>
 
@@ -91,6 +195,46 @@ export function AssetDetailPage() {
           )}
         </Table.Tbody>
       </Table>
+
+      {canManage && (
+        <>
+          <Title order={4}>Change history</Title>
+          <Table striped>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>When</Table.Th>
+                <Table.Th>Who</Table.Th>
+                <Table.Th>What</Table.Th>
+                <Table.Th>Details</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {(history ?? []).map((entry) => (
+                <Table.Tr key={entry.id}>
+                  <Table.Td>{new Date(entry.createdAt).toLocaleString()}</Table.Td>
+                  <Table.Td>
+                    {entry.user ? `${entry.user.firstName} ${entry.user.lastName}`.trim() || entry.user.email : 'System'}
+                  </Table.Td>
+                  <Table.Td>
+                    <Badge variant="light">{entry.action}</Badge>
+                  </Table.Td>
+                  <Table.Td>{entry.metadata?.summary ?? '—'}</Table.Td>
+                </Table.Tr>
+              ))}
+              {(history ?? []).length === 0 && (
+                <Table.Tr>
+                  <Table.Td colSpan={4}>No changes recorded.</Table.Td>
+                </Table.Tr>
+              )}
+            </Table.Tbody>
+          </Table>
+
+          {/* Mounted only while open so each starts from the asset's current values. */}
+          {dialog === 'edit' && <EditAssetDialog asset={asset} opened onClose={() => setDialog(null)} />}
+          {dialog === 'check-out' && <CheckOutDialog asset={asset} opened onClose={() => setDialog(null)} />}
+          {dialog === 'check-in' && <CheckInDialog asset={asset} opened onClose={() => setDialog(null)} />}
+        </>
+      )}
     </Stack>
   );
 }

@@ -49,11 +49,13 @@ model Department {
   code           String // short code, e.g. "MAINT", "HSE", "FIN"
   createdAt      DateTime @default(now())
 
-  organization Organization  @relation(fields: [organizationId], references: [id])
-  users        User[]
-  documents    Document[]
-  consumptions Consumption[]
-  appointments Appointment[]
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  users            User[]
+  documents        Document[]
+  consumptions     Consumption[]
+  appointments     Appointment[]
+  assets           Asset[]
+  assetAssignments AssetAssignment[]
 
   @@unique([organizationId, code])
   @@map("departments")
@@ -121,10 +123,13 @@ model User {
 
   expenseRequestsDecided ExpenseRequest[] @relation("ExpenseRequestDecidedBy")
 
-  purchasesReceived     Purchase[]    @relation("PurchaseReceivedBy")
-  consumptionsIssued    Consumption[] @relation("ConsumptionIssuedBy")
-  appointmentsRequested Appointment[] @relation("AppointmentRequester")
-  appointmentsReviewed  Appointment[] @relation("AppointmentFeedbackBy")
+  purchasesReceived     Purchase[]        @relation("PurchaseReceivedBy")
+  consumptionsIssued    Consumption[]     @relation("ConsumptionIssuedBy")
+  appointmentsRequested Appointment[]     @relation("AppointmentRequester")
+  appointmentsReviewed  Appointment[]     @relation("AppointmentFeedbackBy")
+  assetsHeld            AssetAssignment[] @relation("AssetAssignee")
+  assetsAssigned        AssetAssignment[] @relation("AssetAssignedBy")
+  assetsReceived        AssetAssignment[] @relation("AssetReturnedBy")
 
   // One HR record per employed user. Optional because not every
   // Cognito-authenticated User is necessarily an onboarded employee
@@ -231,24 +236,77 @@ enum MilestoneStatus {
 // vehicles, facilities — and can optionally be tied to the project it's
 // currently deployed on.
 model Asset {
-  id             String      @id @default(uuid())
+  id             String         @id @default(uuid())
   organizationId String
   projectId      String?
   assetTag       String
   name           String
   category       String
-  status         AssetStatus @default(ACTIVE)
+  status         AssetStatus    @default(ACTIVE)
   location       String?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  // The full record: what it is, where it came from, and how good it is.
+  serialNumber   String?
+  make           String?
+  model          String?
+  purchaseDate   DateTime?      @db.Date
+  purchaseCost   Decimal?       @db.Decimal(18, 2)
+  vendorId       String?
+  warrantyExpiry DateTime?      @db.Date
+  condition      AssetCondition @default(GOOD)
+  notes          String?
+  // The department that owns it, as opposed to whoever holds it right now.
+  departmentId   String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  project      Project?     @relation(fields: [projectId], references: [id])
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  project      Project?          @relation(fields: [projectId], references: [id])
+  vendor       Vendor?           @relation(fields: [vendorId], references: [id])
+  department   Department?       @relation(fields: [departmentId], references: [id])
   workOrders   WorkOrder[]
   incidents    Incident[]
+  assignments  AssetAssignment[]
 
   @@unique([organizationId, assetTag])
+  // Postgres lets several rows have no serial number; real ones stay unique.
+  @@unique([organizationId, serialNumber])
   @@map("assets")
+}
+
+enum AssetCondition {
+  NEW
+  GOOD
+  FAIR
+  POOR
+}
+
+// Who has an asset, and for how long. An asset has at most one open
+// assignment (returnedAt is null) at a time; a partial unique index in the
+// migration enforces it. Closed ones are the custody history.
+model AssetAssignment {
+  id             String          @id @default(uuid())
+  assetId        String
+  assigneeId     String?
+  departmentId   String?
+  assignedAt     DateTime        @default(now())
+  expectedReturn DateTime?       @db.Date
+  returnedAt     DateTime?
+  conditionOut   AssetCondition
+  conditionIn    AssetCondition?
+  notes          String?
+  returnNotes    String?
+  assignedById   String
+  returnedById   String?
+
+  asset      Asset       @relation(fields: [assetId], references: [id])
+  assignee   User?       @relation("AssetAssignee", fields: [assigneeId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+  assignedBy User        @relation("AssetAssignedBy", fields: [assignedById], references: [id])
+  returnedBy User?       @relation("AssetReturnedBy", fields: [returnedById], references: [id])
+
+  @@index([assetId, returnedAt])
+  @@index([assigneeId])
+  @@map("asset_assignments")
 }
 
 enum AssetStatus {
@@ -707,6 +765,7 @@ model Vendor {
   organization Organization @relation(fields: [organizationId], references: [id])
   invoices     Invoice[]
   purchases    Purchase[]
+  Asset        Asset[]
 
   @@unique([organizationId, name])
   @@map("vendors")

@@ -40,6 +40,20 @@ export const ACTIVITY_LABELS: Record<string, ActivityLabel> = {
   },
   'POST /stock-transactions/transfer': { action: 'STOCK_TRANSFER', entityType: 'StockTransaction', summary: ({ body }) => `quantity ${body.quantity}` },
 
+  'POST /assets': { action: 'ASSET_CREATE', entityType: 'Asset', summary: ({ res }) => `${res.assetTag} ${res.name}` },
+  'PATCH /assets/:id': { action: 'ASSET_UPDATE', entityType: 'Asset', summary: ({ res }) => `${res.assetTag} ${res.name}` },
+  'POST /assets/:id/check-out': {
+    action: 'ASSET_CHECKED_OUT',
+    entityType: 'Asset',
+    summary: ({ res }) => {
+      const to = res.currentAssignment?.assignee
+        ? `${res.currentAssignment.assignee.firstName} ${res.currentAssignment.assignee.lastName}`.trim() || res.currentAssignment.assignee.email
+        : res.currentAssignment?.department?.name;
+      return `${res.assetTag} to ${to ?? 'someone'}`;
+    },
+  },
+  'POST /assets/:id/check-in': { action: 'ASSET_CHECKED_IN', entityType: 'Asset', summary: ({ res }) => `${res.assetTag} returned, condition ${res.condition}` },
+
   'POST /appointments': { action: 'APPOINTMENT_BOOKED', entityType: 'Appointment', summary: ({ res }) => `${res.subject} on ${String(res.date).slice(0, 10)} at ${res.time}` },
   'POST /appointments/:id/cancel': { action: 'APPOINTMENT_CANCELLED', entityType: 'Appointment', summary: ({ res }) => res.subject },
   'POST /appointments/:id/review': {

@@ -17,6 +17,7 @@ describe('StaffCostRedactionInterceptor', () => {
     id: 'item-1',
     unitCost: new Prisma.Decimal('4.80'),
     stockValue: '38.40',
+    purchaseCost: '900.00',
     totalOnHand: 8,
     createdAt,
     category: null,

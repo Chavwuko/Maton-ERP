@@ -3,9 +3,9 @@ import { Request } from 'express';
 import { map, Observable } from 'rxjs';
 
 // The old store system never showed money to ordinary staff. Cost fields are
-// stripped from every inventory response for the `staff` role; every other
-// role sees them unchanged.
-const COST_FIELDS = new Set(['unitCost', 'stockValue', 'total']);
+// stripped from every inventory and asset response for the `staff` role; every
+// other role sees them unchanged.
+const COST_FIELDS = new Set(['unitCost', 'stockValue', 'total', 'purchaseCost']);
 const HIDDEN_FROM_ROLE = 'staff';
 
 function redact(value: unknown): unknown {

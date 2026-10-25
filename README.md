@@ -190,14 +190,46 @@ multipart body (Document Control), then filter with
 
 ## Assets module
 
-Minimal equipment/vehicle/facility registry — the anchor Maintenance work
-orders point at.
+The equipment, vehicle and facility register: the anchor Maintenance work
+orders point at, with the full record, editing, and who holds each asset.
 
-- `POST /assets` (body: `organizationId`, `assetTag`, `name`, `category`,
-  `projectId?`, `location?`) — restricted to `admin`/`maintenance`.
-  `assetTag` must be unique within the organization (409 on conflict).
-- `GET /assets` (query: `organizationId?`, `status?`, `projectId?`) — list.
-- `GET /assets/:id` — detail with its work order history.
+**The record**: `assetTag` (unique per organization), `name`, `category`,
+`status`, `location`, `projectId?`, plus `serialNumber` (unique per
+organization when set), `make`, `model`, `purchaseDate`, `purchaseCost`,
+`vendorId` (a supplier from the same organization), `warrantyExpiry` (never
+before the purchase date), `condition` (`NEW`/`GOOD`/`FAIR`/`POOR`, default
+`GOOD`), `notes`, and `departmentId` (the owning department, as opposed to
+whoever holds it). The purchase cost is hidden from the `staff` role.
+
+- `POST /assets` (admin/maintenance; body: `organizationId`, `assetTag`,
+  `name`, `category` and any of the optional fields above) — 409 on a
+  duplicate tag or serial number.
+- `PATCH /assets/:id` (admin/maintenance) — change any field; leave one out
+  to keep it, send `null` or `""` to clear an optional one. `status` can only
+  be set between `ACTIVE` and `DECOMMISSIONED`; `UNDER_MAINTENANCE` follows the
+  work orders and cannot be set or changed by hand, and an asset that is
+  checked out cannot be decommissioned.
+- `GET /assets` (query: `organizationId?`, `status?`, `projectId?`,
+  `departmentId?`, `condition?`, `assignedToId?`, `search?` — matches tag,
+  name or serial number) — each asset carries `currentAssignment` (who holds
+  it now, or `null`). `GET /assets/mine` — what the signed-in person holds.
+- `GET /assets/:id` — detail with its work orders.
+- `POST /assets/:id/check-out` (admin/maintenance; body: `assigneeId?`,
+  `departmentId?` — at least one — `expectedReturn?`, `condition?`, `notes?`)
+  — only an `ACTIVE` asset that nobody holds, and only to a person with an
+  active account. A partial unique index in the database guarantees one open
+  assignment per asset even if two people click at once (the second gets 409).
+- `POST /assets/:id/check-in` (admin/maintenance; body: `condition?`, `notes?`)
+  — closes the open assignment; the condition it came back in becomes the
+  asset's condition.
+- `GET /assets/:id/assignments` — the custody history, newest first.
+  `GET /assets/:id/history` (admin/maintenance) — every change made to the
+  asset, taken from the activity log.
+
+**Frontend**: `/assets` has search, status and condition filters and an
+"Assigned to me" switch, with a full "New asset" form. An asset's page shows
+the whole record, who holds it, the custody history, work orders and (for
+admin/maintenance) the change history, with Edit, Check out and Check in.
 
 ## Maintenance module
 
