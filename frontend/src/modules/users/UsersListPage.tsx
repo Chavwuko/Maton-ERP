@@ -12,6 +12,7 @@ import { useTabParam } from '../../lib/useTabParam';
 import { ActivityPanel } from './ActivityPanel';
 import { AccessRequestsPanel } from './AccessRequestsPanel';
 import { AccessSettingsPanel } from './AccessSettingsPanel';
+import { EmailSettingsPanel } from './EmailSettingsPanel';
 import { USER_STATUS_COLORS, USER_STATUS_LABELS, type User } from './types';
 
 function UsersTab({ isAdmin }: { isAdmin: boolean }) {
@@ -192,7 +193,7 @@ export function UsersListPage() {
               Access requests
             </Tabs.Tab>
           )}
-          {isAdmin && <Tabs.Tab value="settings">Sign-up settings</Tabs.Tab>}
+          {isAdmin && <Tabs.Tab value="settings">Settings</Tabs.Tab>}
           {isAdmin && <Tabs.Tab value="activity">Activity log</Tabs.Tab>}
         </Tabs.List>
 
@@ -206,7 +207,10 @@ export function UsersListPage() {
         )}
         {isAdmin && (
           <Tabs.Panel value="settings" pt="md">
-            <AccessSettingsPanel />
+            <Stack gap="xl">
+              <AccessSettingsPanel />
+              <EmailSettingsPanel />
+            </Stack>
           </Tabs.Panel>
         )}
         {isAdmin && (

@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Put } from '@nestjs/common';
 import { Roles } from '../../auth/roles.guard';
 import { UpdateAccessSettingsDto } from './dto/update-access-settings.dto';
+import { UpdateEmailSettingsDto } from './dto/update-email-settings.dto';
 import { SettingsService } from './settings.service';
 
 @Controller('settings')
@@ -16,5 +17,15 @@ export class SettingsController {
   @Put('access')
   updateAccess(@Body() dto: UpdateAccessSettingsDto) {
     return this.settingsService.updateAccess(dto);
+  }
+
+  @Get('email')
+  getEmail() {
+    return this.settingsService.getEmail();
+  }
+
+  @Put('email')
+  updateEmail(@Body() dto: UpdateEmailSettingsDto) {
+    return this.settingsService.updateEmail(dto);
   }
 }

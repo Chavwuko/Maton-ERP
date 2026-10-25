@@ -6,7 +6,7 @@ describe('SettingsController', () => {
   let controller: SettingsController;
 
   beforeEach(() => {
-    service = { getAccess: jest.fn(), updateAccess: jest.fn() } as unknown as jest.Mocked<SettingsService>;
+    service = { getAccess: jest.fn(), updateAccess: jest.fn(), getEmail: jest.fn(), updateEmail: jest.fn() } as unknown as jest.Mocked<SettingsService>;
     controller = new SettingsController(service);
   });
 
@@ -18,5 +18,13 @@ describe('SettingsController', () => {
   it('updateAccess delegates the body', () => {
     controller.updateAccess({ openSignup: false });
     expect(service.updateAccess).toHaveBeenCalledWith({ openSignup: false });
+  });
+
+  it('getEmail and updateEmail delegate', () => {
+    controller.getEmail();
+    controller.updateEmail({ enabled: false });
+
+    expect(service.getEmail).toHaveBeenCalled();
+    expect(service.updateEmail).toHaveBeenCalledWith({ enabled: false });
   });
 });

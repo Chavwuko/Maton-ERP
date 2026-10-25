@@ -3,6 +3,7 @@ import type { AppointmentStatus, Prisma } from '@prisma/client';
 import type { AuthenticatedUser } from '../../auth/cognito-auth.guard';
 import { PrismaService } from '../../database/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
+import { EmailNotifier } from '../mail/email-notifier';
 import {
   AppointmentSchedule,
   applyScheduleChanges,
@@ -54,6 +55,7 @@ export class AppointmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryService,
+    private readonly notifier: EmailNotifier,
   ) {}
 
   getSchedule(): Promise<AppointmentSchedule> {
@@ -119,7 +121,7 @@ export class AppointmentsService {
 
     const lines = await this.cleanLines(this.prisma, dto.items ?? []);
 
-    return this.prisma.$transaction(async (tx) => {
+    const booking = await this.prisma.$transaction(async (tx) => {
       const taken = await tx.appointment.findMany({
         where: { date: new Date(dto.date), time, status: { in: HOLDING_SLOT } },
         select: { requesterId: true },
@@ -145,6 +147,8 @@ export class AppointmentsService {
         include: INCLUDE,
       });
     });
+    void this.notifier.bookingCreated(booking);
+    return booking;
   }
 
   findMine(userId: string) {
@@ -187,7 +191,7 @@ export class AppointmentsService {
       throw new BadRequestException(`This appointment is already ${appointment.status.toLowerCase()}`);
     }
 
-    return this.prisma.appointment.update({
+    const cancelled = await this.prisma.appointment.update({
       where: { id },
       data: {
         status: 'CANCELLED',
@@ -197,6 +201,9 @@ export class AppointmentsService {
       },
       include: INCLUDE,
     });
+    // The store hears when a requester cancels; the requester hears when the store does.
+    void (mine ? this.notifier.bookingCancelledByRequester(cancelled) : this.notifier.bookingDecided(cancelled));
+    return cancelled;
   }
 
   // Approve, decline or complete. Completing can hand over the items: each
@@ -232,7 +239,7 @@ export class AppointmentsService {
 
     const today = nowIn((await getSchedule(this.prisma)).timeZone).date;
 
-    return this.prisma.$transaction(async (tx) => {
+    const reviewed = await this.prisma.$transaction(async (tx) => {
       let issuedNote: string | undefined;
       if (decision === 'COMPLETED') {
         const issued: string[] = [];
@@ -274,6 +281,8 @@ export class AppointmentsService {
       }
       return tx.appointment.findUniqueOrThrow({ where: { id }, include: INCLUDE });
     });
+    void this.notifier.bookingDecided(reviewed);
+    return reviewed;
   }
 
   private async findOneOrThrow(id: string) {

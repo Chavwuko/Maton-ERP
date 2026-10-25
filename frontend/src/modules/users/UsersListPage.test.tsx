@@ -16,6 +16,8 @@ vi.mock('../../api/activity');
 vi.mock('../../api/settings', () => ({
   getAccessSettings: vi.fn().mockResolvedValue({ openSignup: true, allowedEmailDomains: [] }),
   updateAccessSettings: vi.fn(),
+  getEmailSettings: vi.fn().mockResolvedValue({ enabled: true, transport: 'smtp' }),
+  updateEmailSettings: vi.fn(),
 }));
 vi.mock('../../api/organizations', () => ({
   listDepartments: vi.fn().mockResolvedValue([{ id: 'dept-1', organizationId: 'org-1', name: 'Stores', code: 'STR', createdAt: '' }]),
@@ -94,7 +96,7 @@ describe('UsersListPage', () => {
     await screen.findByText('Jane Doe');
 
     expect(screen.queryByRole('tab', { name: /Access requests/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('tab', { name: 'Sign-up settings' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Settings' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
     expect(usersApi.listUsers).not.toHaveBeenCalledWith({ status: 'PENDING' });
   });

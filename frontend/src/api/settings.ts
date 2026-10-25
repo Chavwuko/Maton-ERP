@@ -12,3 +12,18 @@ export function getAccessSettings() {
 export function updateAccessSettings(data: Partial<AccessSettings>) {
   return apiClient.put<AccessSettings>('/settings/access', data);
 }
+
+export interface EmailSettings {
+  enabled: boolean;
+  // 'log' means no mail server is connected: emails are only written to the server log.
+  transport: 'log' | 'smtp';
+}
+
+export function getEmailSettings() {
+  return apiClient.get<EmailSettings>('/settings/email');
+}
+
+export function updateEmailSettings(data: { enabled: boolean }) {
+  return apiClient.put<EmailSettings>('/settings/email', data);
+}
+

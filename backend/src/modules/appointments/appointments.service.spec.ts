@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, NotFoundExc
 import type { AuthenticatedUser } from '../../auth/cognito-auth.guard';
 import { createMockPrisma, MockPrisma } from '../../../test/utils/mock-prisma';
 import type { InventoryService } from '../inventory/inventory.service';
+import type { EmailNotifier } from '../mail/email-notifier';
 import { AppointmentsService } from './appointments.service';
 
 // "Now" is Thursday 2026-10-22, 10:00 in Lagos (09:00 UTC). Saturday the 24th
@@ -30,6 +31,7 @@ const item = (id: string, name = 'Hex Bolt') => ({ id, name, unitOfMeasure: 'pcs
 describe('AppointmentsService', () => {
   let prisma: MockPrisma;
   let inventory: { issueStock: jest.Mock };
+  let notifier: { bookingCreated: jest.Mock; bookingCancelledByRequester: jest.Mock; bookingDecided: jest.Mock };
   let service: AppointmentsService;
 
   beforeEach(() => {
@@ -40,7 +42,8 @@ describe('AppointmentsService', () => {
     prisma = createMockPrisma();
     prisma.appSetting.findMany.mockResolvedValue([]); // the default schedule
     inventory = { issueStock: jest.fn().mockResolvedValue({}) };
-    service = new AppointmentsService(prisma, inventory as unknown as InventoryService);
+    notifier = { bookingCreated: jest.fn(), bookingCancelledByRequester: jest.fn(), bookingDecided: jest.fn() };
+    service = new AppointmentsService(prisma, inventory as unknown as InventoryService, notifier as unknown as EmailNotifier);
   });
 
   afterEach(() => {
@@ -532,6 +535,70 @@ describe('AppointmentsService', () => {
       prisma.appointment.updateMany.mockResolvedValue({ count: 0 } as never);
 
       await expect(service.review('appt-1', { decision: 'APPROVED' }, reviewer)).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('emails', () => {
+    const requester = { id: 'req-1', firstName: 'Ann', lastName: 'Store', email: 'ann@acme.test' };
+
+    it('tells the store about a new booking', async () => {
+      prisma.appointment.findMany.mockResolvedValue([] as never);
+      const created = { id: 'appt-1', subject: 'Gloves' };
+      prisma.appointment.create.mockResolvedValue(created as never);
+
+      await service.book({ date: '2026-10-26', time: '09:00', subject: 'Gloves' }, user());
+
+      expect(notifier.bookingCreated).toHaveBeenCalledWith(created);
+    });
+
+    it('does not tell anyone about a booking that was refused', async () => {
+      await expect(service.book({ date: '2026-10-26', time: '09:00', subject: ' ' }, user())).rejects.toThrow();
+
+      expect(notifier.bookingCreated).not.toHaveBeenCalled();
+    });
+
+    it('tells the store when the requester cancels, and the requester when the store does', async () => {
+      const row = { id: 'appt-1', requesterId: 'req-1', status: 'PENDING', feedback: null };
+      prisma.appointment.findUnique.mockResolvedValue(row as never);
+      const cancelled = { id: 'appt-1', status: 'CANCELLED' };
+      prisma.appointment.update.mockResolvedValue(cancelled as never);
+
+      await service.cancel('appt-1', user());
+      expect(notifier.bookingCancelledByRequester).toHaveBeenCalledWith(cancelled);
+      expect(notifier.bookingDecided).not.toHaveBeenCalled();
+
+      notifier.bookingCancelledByRequester.mockClear();
+      await service.cancel('appt-1', user({ id: 'keeper', roleName: 'inventory' }));
+      expect(notifier.bookingDecided).toHaveBeenCalledWith(cancelled);
+      expect(notifier.bookingCancelledByRequester).not.toHaveBeenCalled();
+    });
+
+    it('tells the requester about the store\'s decision', async () => {
+      prisma.appointment.findUnique.mockResolvedValue({
+        id: 'appt-1',
+        status: 'PENDING',
+        requesterId: 'req-1',
+        departmentId: 'dept-1',
+        subject: 'Gloves',
+        feedback: null,
+        requester,
+      } as never);
+      prisma.appointment.updateMany.mockResolvedValue({ count: 1 } as never);
+      const decided = { id: 'appt-1', status: 'APPROVED' };
+      prisma.appointment.findUniqueOrThrow.mockResolvedValue(decided as never);
+
+      await service.review('appt-1', { decision: 'APPROVED' }, user({ id: 'keeper', roleName: 'inventory' }));
+
+      expect(notifier.bookingDecided).toHaveBeenCalledWith(decided);
+    });
+
+    it('sends nothing when someone else changed the appointment first', async () => {
+      prisma.appointment.findUnique.mockResolvedValue({ id: 'appt-1', status: 'PENDING', requesterId: 'req-1', subject: 'Gloves', requester } as never);
+      prisma.appointment.updateMany.mockResolvedValue({ count: 0 } as never);
+
+      await expect(service.review('appt-1', { decision: 'APPROVED' }, user())).rejects.toThrow(ConflictException);
+
+      expect(notifier.bookingDecided).not.toHaveBeenCalled();
     });
   });
 });

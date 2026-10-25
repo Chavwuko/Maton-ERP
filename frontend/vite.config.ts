@@ -12,6 +12,9 @@ export default defineConfig({
     // jsdom+React+Mantine environments in parallel (the full-suite case)
     // can push a single async modal-open past it under CPU contention even
     // though the same test is instant in isolation.
-    testTimeout: 20000,
+    // The form-heavy tests (several Mantine selects and typed fields) take
+    // 10-15s when the whole suite runs at once, and over 20s on a machine
+    // that is short of memory, so leave generous headroom.
+    testTimeout: 60000,
   },
 })

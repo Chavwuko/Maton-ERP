@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { createMockPrisma, MockPrisma } from '../../../test/utils/mock-prisma';
 import { getAccessSettings, normalizeDomains, signupBlockedReason } from './access-settings';
+import type { MailService } from '../mail/mail.service';
 import { SettingsService } from './settings.service';
 
 describe('access settings', () => {
@@ -62,11 +63,13 @@ describe('access settings', () => {
 
 describe('SettingsService', () => {
   let prisma: MockPrisma;
+  let mail: { transport: { kind: string } };
   let service: SettingsService;
 
   beforeEach(() => {
     prisma = createMockPrisma();
-    service = new SettingsService(prisma);
+    mail = { transport: { kind: 'log' } };
+    service = new SettingsService(prisma, mail as unknown as MailService);
   });
 
   it('getAccess returns the current settings', async () => {
@@ -116,6 +119,47 @@ describe('SettingsService', () => {
     await expect(service.updateAccess({ allowedEmailDomains: 'acme.com' as never })).rejects.toThrow(
       BadRequestException,
     );
+    expect(prisma.appSetting.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe('email settings', () => {
+  let prisma: MockPrisma;
+  let mail: { transport: { kind: string } };
+  let service: SettingsService;
+
+  beforeEach(() => {
+    prisma = createMockPrisma();
+    mail = { transport: { kind: 'smtp' } };
+    service = new SettingsService(prisma, mail as unknown as MailService);
+  });
+
+  it('reports whether email is on, and whether it really goes out', async () => {
+    prisma.appSetting.findUnique.mockResolvedValue(null);
+
+    await expect(service.getEmail()).resolves.toEqual({ enabled: true, transport: 'smtp' });
+
+    prisma.appSetting.findUnique.mockResolvedValue({ key: 'email.enabled', value: 'false' } as never);
+    mail.transport.kind = 'log';
+    await expect(service.getEmail()).resolves.toEqual({ enabled: false, transport: 'log' });
+  });
+
+  it('turns email off and on', async () => {
+    prisma.appSetting.findUnique.mockResolvedValue({ key: 'email.enabled', value: 'false' } as never);
+
+    const result = await service.updateEmail({ enabled: false });
+
+    expect(prisma.appSetting.upsert).toHaveBeenCalledWith({
+      where: { key: 'email.enabled' },
+      update: { value: 'false' },
+      create: { key: 'email.enabled', value: 'false' },
+    });
+    expect(result.enabled).toBe(false);
+  });
+
+  it('rejects anything but true or false', async () => {
+    await expect(service.updateEmail({ enabled: 'yes' as never })).rejects.toThrow(BadRequestException);
+    await expect(service.updateEmail({})).rejects.toThrow('enabled must be true or false');
     expect(prisma.appSetting.upsert).not.toHaveBeenCalled();
   });
 });

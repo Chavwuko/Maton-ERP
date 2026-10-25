@@ -48,6 +48,17 @@ services:
       timeout: 3s
       retries: 10
 
+  # Catches every email the backend sends, so approvals, bookings and the daily
+  # reminder can be seen working without a real mail server. Nothing is ever
+  # delivered: open http://localhost:8025 to read what was "sent".
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: erp-local-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP the backend sends to
+      - "8025:8025" # web inbox
+
   # One-shot: applies pending Prisma migrations and upserts the seed roles,
   # then exits. Uses the `build` stage (has the Prisma CLI + ts-node as
   # devDependencies) rather than the lean `runtime` image the backend
@@ -94,6 +105,11 @@ services:
       S3_PUBLIC_ENDPOINT: http://localhost:9000
       S3_ACCESS_KEY_ID: minioadmin
       S3_SECRET_ACCESS_KEY: minioadmin
+      # Optional: send email to the Mailpit container above (see README, Email).
+      MAIL_TRANSPORT: smtp
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      MAIL_FROM: ERP Foundations <no-reply@erp.local>
     ports:
       - "3000:3000"
     depends_on:
@@ -101,6 +117,8 @@ services:
         condition: service_completed_successfully
       minio:
         condition: service_healthy
+      mailpit:
+        condition: service_started
 
 volumes:
   erp_local_pg_data:

@@ -12,6 +12,7 @@ import { DocumentControlModule } from './modules/document-control/document-contr
 import { HseModule } from './modules/hse/hse.module';
 import { HrModule } from './modules/hr/hr.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
+import { MailModule } from './modules/mail/mail.module';
 import { MaintenanceModule } from './modules/maintenance/maintenance.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
@@ -43,6 +44,7 @@ import { StorageModule } from './storage/storage.module';
     ReportsModule,
     NotificationsModule,
     ActivityModule,
+    MailModule,
   ],
   controllers: [HealthController],
 })

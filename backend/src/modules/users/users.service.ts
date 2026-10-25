@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { EmailNotifier } from '../mail/email-notifier';
 import { ApproveUserDto } from './dto/approve-user.dto';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
 import { RejectUserDto } from './dto/reject-user.dto';
@@ -12,7 +13,10 @@ const USER_INCLUDE = { role: true, department: true } as const;
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifier: EmailNotifier,
+  ) {}
 
   findAll(filters: { role?: string | string[]; isActive?: boolean; status?: UserStatus }) {
     if (filters.status && !USER_STATUSES.includes(filters.status)) {
@@ -59,7 +63,7 @@ export class UsersService {
       await this.assertDepartmentExists(dto.departmentId);
     }
 
-    return this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id: userId },
       data: {
         firstName,
@@ -70,6 +74,11 @@ export class UsersService {
       },
       include: USER_INCLUDE,
     });
+    // Admins are told once, when the request first arrives, not on every edit.
+    if (!user.requestedAt) {
+      void this.notifier.accessRequested(updated, updated.department?.name ?? null);
+    }
+    return updated;
   }
 
   // TODO(roadmap): email the person once approved (role included) — needs an
@@ -84,7 +93,7 @@ export class UsersService {
       await this.assertDepartmentExists(dto.departmentId);
     }
 
-    return this.prisma.user.update({
+    const approved = await this.prisma.user.update({
       where: { id },
       data: {
         status: 'ACTIVE',
@@ -97,6 +106,8 @@ export class UsersService {
       },
       include: USER_INCLUDE,
     });
+    void this.notifier.accessApproved(approved, approved.role?.name ?? dto.roleName);
+    return approved;
   }
 
   // TODO(roadmap): email the person the rejection reason. See README Roadmap.
@@ -106,7 +117,7 @@ export class UsersService {
       throw new BadRequestException('Only a pending request can be rejected');
     }
 
-    return this.prisma.user.update({
+    const rejected = await this.prisma.user.update({
       where: { id },
       data: {
         status: 'REJECTED',
@@ -117,6 +128,8 @@ export class UsersService {
       },
       include: USER_INCLUDE,
     });
+    void this.notifier.accessRejected(rejected, rejected.rejectionReason);
+    return rejected;
   }
 
   async disable(id: string, reviewerId: string) {

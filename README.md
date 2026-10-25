@@ -387,7 +387,49 @@ on **Users -> Activity log**.
 the header: sign-up requests waiting (admin only) and appointments waiting for
 review, each linking to the right tab (`/users?tab=requests`,
 `/appointments?tab=all`; pages keep their selected tab in the URL). The bell
-refreshes every minute. It is in-app only — email is on the Roadmap.
+refreshes every minute. Emails are covered in the Email section.
+
+## Email
+
+The system emails people about what needs their attention (ported from the
+old store system's notifications). All plain text, one message per recipient.
+
+| Event | Who is emailed |
+|---|---|
+| A new sign-up request arrives (first submission only, not edits) | Active admins |
+| A request is approved (with the role) or rejected (with the reason) | The person |
+| An appointment is booked, or its requester cancels it | Active admin and inventory users |
+| An appointment is approved, declined, completed or cancelled by the store | The requester, with the feedback and any "Issued: ..." note |
+| Every day around 08:00 (in the appointment schedule's time zone) | Active admins: anything waiting more than 24 hours |
+
+Emails never get in the way of the action that triggers them: they are sent
+after it has succeeded, and a mail failure is logged, never raised. The daily
+reminder is claimed once per day in the database, so several servers running
+the same schedule send it once. Addresses that cannot be real (`example.com`,
+`local.dev`, `.test`, ...) are skipped, so demo and test data never send mail.
+
+**Switching it on.** By default nothing is delivered: emails are written to the
+server log (`MAIL_TRANSPORT` unset, or `log`). Set the following on the server
+to send them for real; any SMTP server works, including Amazon SES's SMTP
+endpoint. All are optional, so CI and existing deployments are unaffected.
+
+- `MAIL_TRANSPORT=smtp`, `SMTP_HOST`, `SMTP_PORT` (default 587; 465 uses TLS),
+  `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` (e.g. `"ERP Foundations <no-reply@yourcompany.com>"`)
+- `APP_NAME` (subject prefix and sign-off, default `ERP Foundations`) and the
+  existing `FRONTEND_URL` (used for the links in the emails)
+
+**Locally**, `docker-compose.yml` runs Mailpit and points the backend at it, so
+nothing is ever delivered but everything can be read at
+http://localhost:8025. Real-looking addresses are needed to see mail there
+(`@local.dev` and `.test` addresses are skipped).
+
+**The master switch**: `GET/PUT /settings/email` (admin; `enabled`) and
+**Users -> Settings -> Email notifications**. When off, nothing is sent. The
+screen warns when no mail server is connected (`transport: "log"`).
+
+The wording lives in `modules/mail/templates.ts`; the feature's name in the
+emails comes from one constant (`TERM`) so the planned rename of "Appointment"
+(see the Roadmap) changes the emails in one place.
 
 ## Accounting module
 
@@ -674,8 +716,7 @@ raw-UUID `TextInput` fields across Maintenance (work order assignment), HSE
 list, filtered to `document_control`/`admin`), and HR (new employee's
 `userId`); they fall back to showing the email when a user has blank names.
 
-Not built yet: emailing people when they are approved/rejected, and the
-notification bell for admins — tracked in the Roadmap section below.
+People are emailed about approvals and rejections; see the Email section.
 
 ## Adding a new module
 
@@ -1073,14 +1114,13 @@ Standing list of planned work — not yet started unless noted otherwise.
 - **HR dashboard visual redesign** to match a specific sketched layout the
   user will provide (current `HRDashboardPage` layout — stat card row +
   chart grid — is a first pass, not the intended final design).
-- **Email notifications** (to-do): when an admin approves or rejects a
-  sign-up (`UsersService.approve` / `reject`), email the person — approval
-  with their role, rejection with the reason. The same applies to
-  appointments: email store staff when one is booked or cancelled, and the
-  requester when it is approved, declined, completed or cancelled
-  (`AppointmentsService`). There is
-  no email service in the backend yet (the old store system sent these via
-  Apps Script); this needs one (e.g. SES, in step with the Cognito/AWS setup)
-  plus templates. The same service would later carry an email to admins when
-  a new request arrives, and the notification bell. Until then, people only
-  find out by reopening the waiting screen, which re-checks every 10 seconds.
+- **Rename "Appointment"** (to-do): the user wants a different word than
+  "Appointment" for this feature (the booking of a slot with the store). The
+  replacement word has not been chosen yet. Once it is, rename it everywhere
+  people see it: the nav entry and `/appointments` page and tabs, the
+  dashboard cards, notification bell, activity-log entries, emails, and this
+  README. Decide separately whether the API routes, database tables
+  (`appointments`, `appointment_items`) and code names should follow, since
+  renaming those needs a migration and touches every file under
+  `modules/appointments`.
+

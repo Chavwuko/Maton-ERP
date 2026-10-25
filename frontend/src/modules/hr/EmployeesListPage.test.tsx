@@ -114,5 +114,5 @@ describe('EmployeesListPage', () => {
       });
     });
     expect(await screen.findByText('Employee created')).toBeInTheDocument();
-  }, 30000);
+  });
 });

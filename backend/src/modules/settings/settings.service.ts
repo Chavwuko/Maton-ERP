@@ -1,11 +1,17 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { MailService } from '../mail/mail.service';
 import { AccessSettings, getAccessSettings, normalizeDomains, saveAccessSettings } from './access-settings';
 import { UpdateAccessSettingsDto } from './dto/update-access-settings.dto';
+import { UpdateEmailSettingsDto } from './dto/update-email-settings.dto';
+import { isEmailEnabled, setEmailEnabled } from './email-settings';
 
 @Injectable()
 export class SettingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mail: MailService,
+  ) {}
 
   getAccess(): Promise<AccessSettings> {
     return getAccessSettings(this.prisma);
@@ -27,5 +33,19 @@ export class SettingsService {
     };
     await saveAccessSettings(this.prisma, next);
     return next;
+  }
+
+  // `transport` says whether mail really goes out ('smtp') or is only written
+  // to the log ('log'), so the settings screen can be honest about it.
+  async getEmail() {
+    return { enabled: await isEmailEnabled(this.prisma), transport: this.mail.transport.kind };
+  }
+
+  async updateEmail(dto: UpdateEmailSettingsDto) {
+    if (typeof dto.enabled !== 'boolean') {
+      throw new BadRequestException('enabled must be true or false');
+    }
+    await setEmailEnabled(this.prisma, dto.enabled);
+    return this.getEmail();
   }
 }

@@ -1,14 +1,17 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { createMockPrisma, MockPrisma } from '../../../test/utils/mock-prisma';
+import type { EmailNotifier } from '../mail/email-notifier';
 import { UsersService } from './users.service';
 
 describe('UsersService', () => {
   let prisma: MockPrisma;
   let service: UsersService;
+  let notifier: { accessRequested: jest.Mock; accessApproved: jest.Mock; accessRejected: jest.Mock };
 
   beforeEach(() => {
     prisma = createMockPrisma();
-    service = new UsersService(prisma);
+    notifier = { accessRequested: jest.fn(), accessApproved: jest.fn(), accessRejected: jest.fn() };
+    service = new UsersService(prisma, notifier as unknown as EmailNotifier);
   });
 
   const user = { id: 'user-1', email: 'a@b.com', role: { id: 'role-1', name: 'admin' } };
@@ -434,6 +437,72 @@ describe('UsersService', () => {
       await service.update('user-1', { roleName: 'viewer' });
 
       expect(prisma.user.count).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('emails', () => {
+    it('tells admins once, when a sign-up request first arrives, and includes the department', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'PENDING', requestedAt: null, role: null } as never);
+      prisma.department.findUnique.mockResolvedValue({ id: 'dept-1' } as never);
+      const updated = { id: 'user-1', email: 'pat@acme.test', department: { name: 'Stores' } };
+      prisma.user.update.mockResolvedValue(updated as never);
+
+      await service.completeProfile('user-1', { firstName: 'Pat', lastName: 'P', departmentId: 'dept-1' });
+
+      expect(notifier.accessRequested).toHaveBeenCalledWith(updated, 'Stores');
+    });
+
+    it('names no department when there is none, and does not repeat the email on an edit', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'PENDING', requestedAt: null, role: null } as never);
+      prisma.user.update.mockResolvedValue({ id: 'user-1', department: null } as never);
+      await service.completeProfile('user-1', { firstName: 'Pat', lastName: 'P' });
+      expect(notifier.accessRequested).toHaveBeenCalledWith(expect.anything(), null);
+
+      notifier.accessRequested.mockClear();
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'PENDING', requestedAt: new Date(), role: null } as never);
+      await service.completeProfile('user-1', { firstName: 'Pat', lastName: 'Edited' });
+      expect(notifier.accessRequested).not.toHaveBeenCalled();
+    });
+
+    it('tells the person when they are approved, with the role they were given', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'PENDING', departmentId: null, role: null } as never);
+      prisma.role.upsert.mockResolvedValue({ id: 'role-inv', name: 'inventory' } as never);
+      const approved = { id: 'user-1', role: { name: 'inventory' } };
+      prisma.user.update.mockResolvedValue(approved as never);
+
+      await service.approve('user-1', { roleName: 'inventory' }, 'admin-1');
+
+      expect(notifier.accessApproved).toHaveBeenCalledWith(approved, 'inventory');
+    });
+
+    it('falls back to the requested role name if the saved user has no role loaded', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'PENDING', departmentId: null, role: null } as never);
+      prisma.role.upsert.mockResolvedValue({ id: 'role-inv', name: 'inventory' } as never);
+      prisma.user.update.mockResolvedValue({ id: 'user-1', role: null } as never);
+
+      await service.approve('user-1', { roleName: 'staff' }, 'admin-1');
+
+      expect(notifier.accessApproved).toHaveBeenCalledWith(expect.anything(), 'staff');
+    });
+
+    it('tells the person when they are rejected, with the reason', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'PENDING', role: null } as never);
+      const rejected = { id: 'user-1', rejectionReason: 'Not a contractor of ours' };
+      prisma.user.update.mockResolvedValue(rejected as never);
+
+      await service.reject('user-1', { reason: 'Not a contractor of ours' }, 'admin-1');
+
+      expect(notifier.accessRejected).toHaveBeenCalledWith(rejected, 'Not a contractor of ours');
+    });
+
+    it('sends nothing when the action is refused', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'ACTIVE', role: null } as never);
+
+      await expect(service.reject('user-1', {}, 'admin-1')).rejects.toThrow();
+      await expect(service.approve('user-1', { roleName: 'staff' }, 'admin-1')).rejects.toThrow();
+
+      expect(notifier.accessRejected).not.toHaveBeenCalled();
+      expect(notifier.accessApproved).not.toHaveBeenCalled();
     });
   });
 });
