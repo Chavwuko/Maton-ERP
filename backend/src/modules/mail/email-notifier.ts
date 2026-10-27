@@ -63,6 +63,22 @@ export class EmailNotifier {
     });
   }
 
+  // Whoever it is assigned to hears about a preventive work order the moment a
+  // schedule opens it; with no one assigned, the maintenance team does.
+  scheduledWorkOrder(workOrder: {
+    title: string;
+    assetTag: string;
+    assetName: string;
+    dueDate: Date;
+    assignee: { email: string } | null;
+  }) {
+    return this.safely('scheduledWorkOrder', async () => {
+      const email = templates.scheduledWorkOrder(workOrder);
+      const to = workOrder.assignee ? [workOrder.assignee.email] : await this.emailsOf(['maintenance']);
+      await this.mail.send(to, email.subject, email.body + this.mail.link('/maintenance', 'Open work orders'));
+    });
+  }
+
   // Active admin/inventory users with an email address.
   async emailsOf(roles: string[]): Promise<string[]> {
     const users = await this.prisma.user.findMany({

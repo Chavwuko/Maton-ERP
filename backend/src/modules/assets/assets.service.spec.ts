@@ -520,10 +520,36 @@ describe('AssetsService', () => {
       );
     });
 
+    it('summarises the completed work: count, preventive share, total cost and the last visit', async () => {
+      const lastServiceAt = new Date('2026-10-20T09:00:00.000Z');
+      prisma.workOrder.findMany.mockResolvedValue([
+        { id: 'wo-2', type: 'PREVENTIVE', cost: new Prisma.Decimal('100.10'), completedAt: lastServiceAt },
+        { id: 'wo-1', type: 'CORRECTIVE', cost: null, completedAt: new Date('2026-09-01') },
+        { id: 'wo-0', type: 'CORRECTIVE', cost: new Prisma.Decimal('50.20'), completedAt: new Date('2026-08-01') },
+      ] as never);
+
+      const result = await service.serviceHistory('a1');
+
+      expect(prisma.workOrder.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { assetId: 'a1', status: 'COMPLETED' }, orderBy: { completedAt: 'desc' } }),
+      );
+      expect(result.workOrders).toHaveLength(3);
+      expect(result.totals).toEqual({ count: 3, preventive: 1, cost: new Prisma.Decimal('150.30'), lastServiceAt });
+    });
+
+    it('has no last visit and a zero total for an asset that was never serviced', async () => {
+      prisma.workOrder.findMany.mockResolvedValue([]);
+
+      const result = await service.serviceHistory('a1');
+
+      expect(result.totals).toEqual({ count: 0, preventive: 0, cost: new Prisma.Decimal(0), lastServiceAt: null });
+    });
+
     it('404s for an unknown asset', async () => {
       prisma.asset.findUnique.mockResolvedValue(null);
 
       await expect(service.assignments('x')).rejects.toThrow(NotFoundException);
+      await expect(service.serviceHistory('x')).rejects.toThrow(NotFoundException);
       await expect(service.history('x')).rejects.toThrow(NotFoundException);
     });
   });

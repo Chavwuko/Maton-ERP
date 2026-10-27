@@ -229,7 +229,8 @@ whoever holds it). The purchase cost is hidden from the `staff` role.
 **Frontend**: `/assets` has search, status and condition filters and an
 "Assigned to me" switch, with a full "New asset" form. An asset's page shows
 the whole record, who holds it, the custody history, work orders and (for
-admin/maintenance) the change history, with Edit, Check out and Check in.
+admin/maintenance) the change history, with Edit, Check out and Check in; see
+the Maintenance module for its schedules and service history.
 
 ## Maintenance module
 
@@ -256,6 +257,54 @@ keeps the asset's own status in sync automatically.
   `UNDER_MAINTENANCE`; moving it to `COMPLETED`/`CANCELLED` sets the asset
   back to `ACTIVE` only once no other work order against it is still
   `OPEN`/`IN_PROGRESS`/`ON_HOLD`.
+  Completing may also carry `completionNotes?` (what was done) and `cost?`
+  (zero or more); both are refused with any other status. They show in the
+  asset's service history.
+
+### Preventive maintenance schedules
+
+A schedule says "do this to that asset every N days/weeks/months/years". It
+opens a `PREVENTIVE` work order a few days ahead of each due date and moves
+on when that work order is finished, so planned servicing never depends on
+someone remembering.
+
+- `POST /maintenance-schedules` (admin/maintenance; body: `assetId`,
+  `title`, `intervalValue`, `intervalUnit` (`DAYS`/`WEEKS`/`MONTHS`/`YEARS`),
+  `firstDueDate`, `description?`, `basis?`, `priority?`, `leadDays?` (default
+  7), `assignedToId?`). Refused for a decommissioned asset. A schedule already
+  inside its lead time opens its work order straight away.
+- `GET /maintenance-schedules` (query: `organizationId?`, `assetId?`,
+  `active?`, `dueStatus?`) and `GET /maintenance-schedules/:id` — each carries
+  `dueStatus`: `OVERDUE` (due date passed), `DUE_SOON` (inside its lead time),
+  `UPCOMING`, or `PAUSED` (switched off).
+- `PATCH /maintenance-schedules/:id` (admin/maintenance) — change anything,
+  including `nextDueDate` and `active` (pause/resume).
+  `DELETE /maintenance-schedules/:id` (admin) — work orders it already opened
+  are kept.
+- `POST /maintenance-schedules/generate` (admin/maintenance) — open the work
+  orders that are due now. The same check also runs hourly (minute 15).
+  There is only ever one open work order per schedule (enforced by a partial
+  unique index), so running it twice, or on two servers, is harmless.
+
+Two ways to count the interval (`basis`): **`FIXED`** stays on the calendar
+(every 3 months from 1 Jan is 1 Apr, 1 Jul… even if a job is done late; if
+several are missed it jumps to the first date after today) and **`FLOATING`**
+counts from the day the job was finished. Completing the work order moves the
+schedule on and records `lastCompletedDate`; cancelling it skips that
+occurrence without counting it as done. Month-end dates clamp (31 Jan + 1 month
+is 28/29 Feb). "Today" is judged in the store's time zone from the
+appointment settings. The assignee (or, with none, the maintenance team) is
+emailed when a work order is opened.
+
+`GET /assets/:id/service-history` lists the asset's completed work orders with
+notes, cost, who did them and the parts issued against them, plus totals
+(jobs, preventive jobs, total cost, last serviced).
+
+**Frontend**: Maintenance has two pages, *Work orders* and *Schedules*
+(`/maintenance/schedules`, with due-status filter, pause/resume, edit, delete
+for admin and "Open due work orders"). Completing a work order asks what was
+done and what it cost. An asset's page lists its schedules and its service
+history.
 
 To attach a document (photo, completion report) to a work order, pass
 `workOrderId` in the `POST /documents` multipart body, then filter with

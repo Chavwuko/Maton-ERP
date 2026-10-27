@@ -6,6 +6,7 @@ import {
   bookingCreated,
   bookingDecided,
   personName,
+  scheduledWorkOrder,
   TERM,
   waitingReminder,
   type BookingMail,
@@ -99,6 +100,15 @@ describe('email templates', () => {
 
       expect(email.subject).toBe('Your appointment was cancelled — Gloves');
       expect(email.body).toContain('Your appointment was cancelled by the store.');
+    });
+  });
+
+  describe('preventive maintenance', () => {
+    it('tells the maintenance team what is due, on which asset, and when', () => {
+      expect(scheduledWorkOrder({ title: 'Grease bearings', assetTag: 'PUMP-1', assetName: 'Pump', dueDate: new Date('2026-11-01') })).toEqual({
+        subject: 'Preventive maintenance due — Grease bearings (PUMP-1)',
+        body: 'A preventive work order has been opened for PUMP-1 Pump:\n\nGrease bearings\nDue: 2026-11-01',
+      });
     });
   });
 

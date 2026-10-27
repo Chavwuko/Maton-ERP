@@ -7,6 +7,7 @@ import { AssetDetailPage } from './modules/assets/AssetDetailPage';
 import { AssetsListPage } from './modules/assets/AssetsListPage';
 import { MaintenanceDetailPage } from './modules/maintenance/MaintenanceDetailPage';
 import { MaintenanceListPage } from './modules/maintenance/MaintenanceListPage';
+import { SchedulesPage } from './modules/maintenance/SchedulesPage';
 import { ProjectDetailPage } from './modules/projects/ProjectDetailPage';
 import { ProjectsListPage } from './modules/projects/ProjectsListPage';
 import { HseDetailPage } from './modules/hse/HseDetailPage';
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="/assets" element={<AssetsListPage />} />
         <Route path="/assets/:id" element={<AssetDetailPage />} />
         <Route path="/maintenance" element={<MaintenanceListPage />} />
+        <Route path="/maintenance/schedules" element={<SchedulesPage />} />
         <Route path="/maintenance/:id" element={<MaintenanceDetailPage />} />
         <Route path="/projects" element={<ProjectsListPage />} />
         <Route path="/projects/:id" element={<ProjectDetailPage />} />

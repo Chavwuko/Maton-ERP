@@ -3,16 +3,18 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Anchor, Badge, Button, Group, Loader, Paper, Stack, Table, Text, Title } from '@mantine/core';
 import { ApiError } from '../../api/client';
-import { getAsset, getAssetHistory, listAssetAssignments } from '../../api/assets';
+import { getAsset, getAssetHistory, getAssetServiceHistory, listAssetAssignments } from '../../api/assets';
+import { listSchedules } from '../../api/maintenance';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useRole } from '../../auth/RoleContext';
 import { hasRole } from '../../auth/roleStore';
-import { formatMoney } from '../inventory/format';
-import { WORK_ORDER_STATUS_COLORS } from '../maintenance/types';
+import { formatMoney, formatQty } from '../inventory/format';
+import { ScheduleDialog } from '../maintenance/ScheduleDialog';
+import { DUE_STATUS_COLORS, intervalLabel, WORK_ORDER_STATUS_COLORS } from '../maintenance/types';
 import { CheckInDialog, CheckOutDialog, EditAssetDialog } from './AssetDialogs';
 import { ASSET_CONDITION_COLORS, ASSET_STATUS_COLORS, assetDate, holderName } from './types';
 
-type Dialog = 'edit' | 'check-out' | 'check-in' | null;
+type Dialog = 'edit' | 'check-out' | 'check-in' | 'schedule' | null;
 
 export function AssetDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +36,18 @@ export function AssetDetailPage() {
   const { data: custody } = useQuery({
     queryKey: ['assets', id, 'assignments'],
     queryFn: () => listAssetAssignments(id!),
+    enabled: !!id,
+  });
+
+  const { data: schedules } = useQuery({
+    queryKey: ['maintenance-schedules', { assetId: id }],
+    queryFn: () => listSchedules({ assetId: id }),
+    enabled: !!id,
+  });
+
+  const { data: service } = useQuery({
+    queryKey: ['assets', id, 'service-history'],
+    queryFn: () => getAssetServiceHistory(id!),
     enabled: !!id,
   });
 
@@ -196,6 +210,92 @@ export function AssetDetailPage() {
         </Table.Tbody>
       </Table>
 
+      <Group justify="space-between">
+        <Title order={4}>Maintenance schedules</Title>
+        {canManage && asset.status !== 'DECOMMISSIONED' && (
+          <Button variant="light" size="xs" onClick={() => setDialog('schedule')}>
+            Schedule maintenance
+          </Button>
+        )}
+      </Group>
+      <Table striped highlightOnHover>
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Task</Table.Th>
+            <Table.Th>Repeats</Table.Th>
+            <Table.Th>Next due</Table.Th>
+            <Table.Th>Last done</Table.Th>
+            <Table.Th>Status</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {(schedules ?? []).map((schedule) => (
+            <Table.Tr key={schedule.id}>
+              <Table.Td>{schedule.title}</Table.Td>
+              <Table.Td>{intervalLabel(schedule.intervalValue, schedule.intervalUnit)}</Table.Td>
+              <Table.Td>{assetDate(schedule.nextDueDate)}</Table.Td>
+              <Table.Td>{assetDate(schedule.lastCompletedDate)}</Table.Td>
+              <Table.Td>
+                <Badge color={DUE_STATUS_COLORS[schedule.dueStatus]} variant="light">
+                  {schedule.dueStatus.replace(/_/g, ' ')}
+                </Badge>
+              </Table.Td>
+            </Table.Tr>
+          ))}
+          {(schedules ?? []).length === 0 && (
+            <Table.Tr>
+              <Table.Td colSpan={5}>No maintenance scheduled.</Table.Td>
+            </Table.Tr>
+          )}
+        </Table.Tbody>
+      </Table>
+
+      <Title order={4}>Service history</Title>
+      {service && service.totals.count > 0 && (
+        <Text size="sm" c="dimmed">
+          {service.totals.count} completed job{service.totals.count === 1 ? '' : 's'} · {service.totals.preventive} preventive · total cost{' '}
+          {formatMoney(service.totals.cost)} · last serviced {new Date(service.totals.lastServiceAt!).toLocaleDateString()}
+        </Text>
+      )}
+      <Table striped highlightOnHover>
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Completed</Table.Th>
+            <Table.Th>Job</Table.Th>
+            <Table.Th>What was done</Table.Th>
+            <Table.Th>Parts used</Table.Th>
+            <Table.Th>Cost</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {(service?.workOrders ?? []).map((wo) => (
+            <Table.Tr key={wo.id}>
+              <Table.Td>{wo.completedAt ? new Date(wo.completedAt).toLocaleDateString() : '—'}</Table.Td>
+              <Table.Td>
+                <Anchor component={Link} to={`/maintenance/${wo.id}`}>
+                  {wo.title}
+                </Anchor>
+                <Text size="xs" c="dimmed">
+                  {wo.type === 'PREVENTIVE' ? 'Preventive' : 'Repair'}
+                </Text>
+              </Table.Td>
+              <Table.Td>{wo.completionNotes ?? '—'}</Table.Td>
+              <Table.Td>
+                {wo.stockTransactions.length === 0
+                  ? '—'
+                  : wo.stockTransactions.map((line) => `${formatQty(Math.abs(line.quantity))} ${line.item.unitOfMeasure} ${line.item.name}`).join(', ')}
+              </Table.Td>
+              <Table.Td>{wo.cost == null ? '—' : formatMoney(wo.cost)}</Table.Td>
+            </Table.Tr>
+          ))}
+          {(service?.workOrders ?? []).length === 0 && (
+            <Table.Tr>
+              <Table.Td colSpan={5}>No completed maintenance yet.</Table.Td>
+            </Table.Tr>
+          )}
+        </Table.Tbody>
+      </Table>
+
       {canManage && (
         <>
           <Title order={4}>Change history</Title>
@@ -233,6 +333,7 @@ export function AssetDetailPage() {
           {dialog === 'edit' && <EditAssetDialog asset={asset} opened onClose={() => setDialog(null)} />}
           {dialog === 'check-out' && <CheckOutDialog asset={asset} opened onClose={() => setDialog(null)} />}
           {dialog === 'check-in' && <CheckInDialog asset={asset} opened onClose={() => setDialog(null)} />}
+          {dialog === 'schedule' && <ScheduleDialog assetId={asset.id} opened onClose={() => setDialog(null)} />}
         </>
       )}
     </Stack>

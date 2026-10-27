@@ -20,24 +20,25 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  departments     Department[]
-  projects        Project[]
-  assets          Asset[]
-  documents       Document[]
-  workOrders      WorkOrder[]
-  warehouses      Warehouse[]
-  inventoryItems  InventoryItem[]
-  vendors         Vendor[]
-  invoices        Invoice[]
-  incidents       Incident[]
-  employees       Employee[]
-  appraisalCycles AppraisalCycle[]
-  appraisals      Appraisal[]
-  shifts          Shift[]
-  expenseRequests ExpenseRequest[]
-  itemCategories  ItemCategory[]
-  purchases       Purchase[]
-  consumptions    Consumption[]
+  departments          Department[]
+  projects             Project[]
+  assets               Asset[]
+  maintenanceSchedules MaintenanceSchedule[]
+  documents            Document[]
+  workOrders           WorkOrder[]
+  warehouses           Warehouse[]
+  inventoryItems       InventoryItem[]
+  vendors              Vendor[]
+  invoices             Invoice[]
+  incidents            Incident[]
+  employees            Employee[]
+  appraisalCycles      AppraisalCycle[]
+  appraisals           Appraisal[]
+  shifts               Shift[]
+  expenseRequests      ExpenseRequest[]
+  itemCategories       ItemCategory[]
+  purchases            Purchase[]
+  consumptions         Consumption[]
 
   @@map("organizations")
 }
@@ -123,13 +124,15 @@ model User {
 
   expenseRequestsDecided ExpenseRequest[] @relation("ExpenseRequestDecidedBy")
 
-  purchasesReceived     Purchase[]        @relation("PurchaseReceivedBy")
-  consumptionsIssued    Consumption[]     @relation("ConsumptionIssuedBy")
-  appointmentsRequested Appointment[]     @relation("AppointmentRequester")
-  appointmentsReviewed  Appointment[]     @relation("AppointmentFeedbackBy")
-  assetsHeld            AssetAssignment[] @relation("AssetAssignee")
-  assetsAssigned        AssetAssignment[] @relation("AssetAssignedBy")
-  assetsReceived        AssetAssignment[] @relation("AssetReturnedBy")
+  purchasesReceived     Purchase[]            @relation("PurchaseReceivedBy")
+  consumptionsIssued    Consumption[]         @relation("ConsumptionIssuedBy")
+  appointmentsRequested Appointment[]         @relation("AppointmentRequester")
+  appointmentsReviewed  Appointment[]         @relation("AppointmentFeedbackBy")
+  assetsHeld            AssetAssignment[]     @relation("AssetAssignee")
+  assetsAssigned        AssetAssignment[]     @relation("AssetAssignedBy")
+  assetsReceived        AssetAssignment[]     @relation("AssetReturnedBy")
+  schedulesAssigned     MaintenanceSchedule[] @relation("ScheduleAssignee")
+  schedulesCreated      MaintenanceSchedule[] @relation("ScheduleCreator")
 
   // One HR record per employed user. Optional because not every
   // Cognito-authenticated User is necessarily an onboarded employee
@@ -259,13 +262,14 @@ model Asset {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  organization Organization      @relation(fields: [organizationId], references: [id])
-  project      Project?          @relation(fields: [projectId], references: [id])
-  vendor       Vendor?           @relation(fields: [vendorId], references: [id])
-  department   Department?       @relation(fields: [departmentId], references: [id])
+  organization Organization          @relation(fields: [organizationId], references: [id])
+  project      Project?              @relation(fields: [projectId], references: [id])
+  vendor       Vendor?               @relation(fields: [vendorId], references: [id])
+  department   Department?           @relation(fields: [departmentId], references: [id])
   workOrders   WorkOrder[]
   incidents    Incident[]
   assignments  AssetAssignment[]
+  schedules    MaintenanceSchedule[]
 
   @@unique([organizationId, assetTag])
   // Postgres lets several rows have no serial number; real ones stay unique.
@@ -447,31 +451,85 @@ enum ApprovalStatus {
 // ---------------------------------------------------------------------------
 
 model WorkOrder {
-  id             String            @id @default(uuid())
-  organizationId String
-  assetId        String
-  title          String
-  description    String?
-  type           WorkOrderType     @default(CORRECTIVE)
-  priority       WorkOrderPriority @default(MEDIUM)
-  status         WorkOrderStatus   @default(OPEN)
-  requestedById  String
-  assignedToId   String?
-  dueDate        DateTime?
-  completedAt    DateTime?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  id              String            @id @default(uuid())
+  organizationId  String
+  assetId         String
+  title           String
+  description     String?
+  type            WorkOrderType     @default(CORRECTIVE)
+  priority        WorkOrderPriority @default(MEDIUM)
+  status          WorkOrderStatus   @default(OPEN)
+  requestedById   String
+  assignedToId    String?
+  dueDate         DateTime?
+  completedAt     DateTime?
+  // Set when a preventive maintenance schedule opened this work order.
+  scheduleId      String?
+  // Filled in when it is completed: what was done, and what it cost.
+  completionNotes String?
+  cost            Decimal?          @db.Decimal(18, 2)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
-  organization      Organization       @relation(fields: [organizationId], references: [id])
-  asset             Asset              @relation(fields: [assetId], references: [id])
-  requestedBy       User               @relation("WorkOrderRequestedBy", fields: [requestedById], references: [id])
-  assignedTo        User?              @relation("WorkOrderAssignedTo", fields: [assignedToId], references: [id])
+  organization      Organization         @relation(fields: [organizationId], references: [id])
+  asset             Asset                @relation(fields: [assetId], references: [id])
+  schedule          MaintenanceSchedule? @relation(fields: [scheduleId], references: [id])
+  requestedBy       User                 @relation("WorkOrderRequestedBy", fields: [requestedById], references: [id])
+  assignedTo        User?                @relation("WorkOrderAssignedTo", fields: [assignedToId], references: [id])
   documents         Document[]
   stockTransactions StockTransaction[]
 
   @@index([organizationId, status])
   @@index([assetId, status])
   @@map("work_orders")
+}
+
+enum ScheduleIntervalUnit {
+  DAYS
+  WEEKS
+  MONTHS
+  YEARS
+}
+
+// FIXED keeps to the calendar (every 3 months from the due date, however late
+// the last service was done); FLOATING counts from the day it was last done.
+enum ScheduleBasis {
+  FIXED
+  FLOATING
+}
+
+// A recurring preventive maintenance plan for one asset. When nextDueDate is
+// within leadDays, a PREVENTIVE work order is opened automatically (at most one
+// open per schedule, enforced by a partial unique index in the migration).
+// Completing it moves nextDueDate on; cancelling it skips that occurrence.
+model MaintenanceSchedule {
+  id                String               @id @default(uuid())
+  organizationId    String
+  assetId           String
+  title             String
+  description       String?
+  intervalValue     Int
+  intervalUnit      ScheduleIntervalUnit
+  basis             ScheduleBasis        @default(FIXED)
+  priority          WorkOrderPriority    @default(MEDIUM)
+  assignedToId      String?
+  leadDays          Int                  @default(7)
+  nextDueDate       DateTime             @db.Date
+  lastCompletedDate DateTime?            @db.Date
+  active            Boolean              @default(true)
+  createdById       String
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  asset        Asset        @relation(fields: [assetId], references: [id])
+  assignedTo   User?        @relation("ScheduleAssignee", fields: [assignedToId], references: [id])
+  createdBy    User         @relation("ScheduleCreator", fields: [createdById], references: [id])
+  workOrders   WorkOrder[]
+
+  @@index([active, nextDueDate])
+  @@index([assetId])
+  @@map("maintenance_schedules")
 }
 
 enum WorkOrderType {

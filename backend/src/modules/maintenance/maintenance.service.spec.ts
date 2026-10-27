@@ -1,14 +1,18 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { createMockPrisma, MockPrisma } from '../../../test/utils/mock-prisma';
 import { MaintenanceService } from './maintenance.service';
+import type { MaintenanceSchedulesService } from './schedules/maintenance-schedules.service';
 
 describe('MaintenanceService', () => {
   let prisma: MockPrisma;
+  let schedules: { onWorkOrderClosed: jest.Mock };
   let service: MaintenanceService;
 
   beforeEach(() => {
     prisma = createMockPrisma();
-    service = new MaintenanceService(prisma);
+    schedules = { onWorkOrderClosed: jest.fn() };
+    service = new MaintenanceService(prisma, schedules as unknown as MaintenanceSchedulesService);
   });
 
   describe('findAll', () => {
@@ -160,6 +164,85 @@ describe('MaintenanceService', () => {
         expect.objectContaining({ where: { id: 'wo-1' }, data: { assignedToId: 'u2' } }),
       );
       expect(result).toEqual({ id: 'wo-1', assignedToId: 'u2' });
+    });
+  });
+
+  describe('completion details and schedules', () => {
+    const open = (extra = {}) =>
+      prisma.workOrder.findUnique.mockResolvedValue({ id: 'wo-1', assetId: 'a1', status: 'IN_PROGRESS', scheduleId: null, ...extra } as never);
+
+    beforeEach(() => {
+      prisma.workOrder.update.mockResolvedValue({ id: 'wo-1' } as never);
+      prisma.asset.findUniqueOrThrow.mockResolvedValue({ id: 'a1', status: 'UNDER_MAINTENANCE' } as never);
+      prisma.workOrder.count.mockResolvedValue(0);
+    });
+
+    it('records what was done and what it cost when completing', async () => {
+      open();
+
+      await service.updateStatus('wo-1', { status: 'COMPLETED', completionNotes: ' Replaced the seal ', cost: 125.5 });
+
+      expect(prisma.workOrder.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            status: 'COMPLETED',
+            completedAt: expect.any(Date),
+            completionNotes: 'Replaced the seal',
+            cost: new Prisma.Decimal('125.50'),
+          },
+        }),
+      );
+    });
+
+    it('leaves notes and cost alone when none are given', async () => {
+      open();
+
+      await service.updateStatus('wo-1', { status: 'COMPLETED' });
+
+      expect(prisma.workOrder.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ completionNotes: undefined, cost: undefined }) }),
+      );
+    });
+
+    it('treats blank completion notes as none', async () => {
+      open();
+
+      await service.updateStatus('wo-1', { status: 'COMPLETED', completionNotes: '   ' });
+
+      expect(prisma.workOrder.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ completionNotes: undefined }) }),
+      );
+    });
+
+    it('refuses notes or cost on any other status, and a bad cost', async () => {
+      open();
+
+      await expect(service.updateStatus('wo-1', { status: 'ON_HOLD', completionNotes: 'x' })).rejects.toThrow(
+        'only be recorded when completing',
+      );
+      await expect(service.updateStatus('wo-1', { status: 'CANCELLED', cost: 5 })).rejects.toThrow(BadRequestException);
+      await expect(service.updateStatus('wo-1', { status: 'COMPLETED', cost: -1 })).rejects.toThrow('cost must be zero or more');
+      await expect(service.updateStatus('wo-1', { status: 'COMPLETED', cost: Number.NaN })).rejects.toThrow('cost must be zero or more');
+      expect(prisma.workOrder.update).not.toHaveBeenCalled();
+    });
+
+    it('moves a schedule on when its work order is completed or cancelled', async () => {
+      open({ scheduleId: 'sch-1' });
+      await service.updateStatus('wo-1', { status: 'COMPLETED' });
+      expect(schedules.onWorkOrderClosed).toHaveBeenCalledWith(prisma, 'sch-1', 'COMPLETED');
+
+      open({ scheduleId: 'sch-1' });
+      await service.updateStatus('wo-1', { status: 'CANCELLED' });
+      expect(schedules.onWorkOrderClosed).toHaveBeenLastCalledWith(prisma, 'sch-1', 'CANCELLED');
+    });
+
+    it('does not touch the schedule for other moves, or for work orders without one', async () => {
+      open({ scheduleId: 'sch-1' });
+      await service.updateStatus('wo-1', { status: 'ON_HOLD' });
+      open({ scheduleId: null });
+      await service.updateStatus('wo-1', { status: 'COMPLETED' });
+
+      expect(schedules.onWorkOrderClosed).not.toHaveBeenCalled();
     });
   });
 });

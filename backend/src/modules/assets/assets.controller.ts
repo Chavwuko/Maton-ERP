@@ -45,6 +45,11 @@ export class AssetsController {
     return this.assetsService.assignments(id);
   }
 
+  @Get(':id/service-history')
+  serviceHistory(@Param('id') id: string) {
+    return this.assetsService.serviceHistory(id);
+  }
+
   @Roles('admin', 'maintenance')
   @Get(':id/history')
   history(@Param('id') id: string) {

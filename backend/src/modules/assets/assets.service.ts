@@ -234,6 +234,34 @@ export class AssetsService {
     });
   }
 
+  // What has been done to the asset: every completed work order, with notes,
+  // cost and the parts taken from stock for it, plus the totals.
+  async serviceHistory(id: string) {
+    await this.findOne(id);
+    const workOrders = await this.prisma.workOrder.findMany({
+      where: { assetId: id, status: 'COMPLETED' },
+      include: {
+        assignedTo: PERSON,
+        stockTransactions: {
+          where: { type: 'ISSUE' },
+          include: { item: { select: { id: true, sku: true, name: true, unitOfMeasure: true } } },
+        },
+      },
+      orderBy: { completedAt: 'desc' },
+    });
+
+    const totalCost = workOrders.reduce((sum, workOrder) => sum.plus(workOrder.cost ?? 0), new Prisma.Decimal(0));
+    return {
+      workOrders,
+      totals: {
+        count: workOrders.length,
+        preventive: workOrders.filter((workOrder) => workOrder.type === 'PREVENTIVE').length,
+        cost: totalCost.toDecimalPlaces(2),
+        lastServiceAt: workOrders[0]?.completedAt ?? null,
+      },
+    };
+  }
+
   // Every change made to this asset, from the activity log.
   async history(id: string) {
     await this.findOne(id);

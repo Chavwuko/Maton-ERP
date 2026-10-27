@@ -93,6 +93,19 @@ export function bookingDecided(booking: BookingMail): Email {
   };
 }
 
+// To whoever does the maintenance when a schedule opens a preventive work order.
+export function scheduledWorkOrder(workOrder: { title: string; assetTag: string; assetName: string; dueDate: Date }): Email {
+  return {
+    subject: `Preventive maintenance due — ${workOrder.title} (${workOrder.assetTag})`,
+    body:
+      `A preventive work order has been opened for ${workOrder.assetTag} ${workOrder.assetName}:
+
+` +
+      `${workOrder.title}
+Due: ${day(workOrder.dueDate)}`,
+  };
+}
+
 export function waitingReminder(
   requests: { name: string; email: string }[],
   bookings: { subject: string; requester: string; date: Date; time: string }[],

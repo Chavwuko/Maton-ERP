@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { AssetStatus, Prisma, WorkOrderPriority, WorkOrderStatus, WorkOrderType } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AssignWorkOrderDto } from './dto/assign-work-order.dto';
+import { MaintenanceSchedulesService } from './schedules/maintenance-schedules.service';
 import { CreateWorkOrderDto } from './dto/create-work-order.dto';
 import { UpdateWorkOrderStatusDto } from './dto/update-work-order-status.dto';
 
@@ -24,7 +25,10 @@ const ACTIVE_STATUSES: WorkOrderStatus[] = ['OPEN', 'IN_PROGRESS', 'ON_HOLD'];
 
 @Injectable()
 export class MaintenanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly schedules: MaintenanceSchedulesService,
+  ) {}
 
   findAll(filters: {
     organizationId?: string;
@@ -99,17 +103,30 @@ export class MaintenanceService {
       );
     }
 
+    if ((dto.completionNotes !== undefined || dto.cost !== undefined) && dto.status !== 'COMPLETED') {
+      throw new BadRequestException('Completion notes and cost can only be recorded when completing a work order');
+    }
+    if (dto.cost !== undefined && (!Number.isFinite(Number(dto.cost)) || Number(dto.cost) < 0)) {
+      throw new BadRequestException('cost must be zero or more');
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.workOrder.update({
         where: { id },
         data: {
           status: dto.status,
           completedAt: dto.status === 'COMPLETED' ? new Date() : undefined,
+          completionNotes: dto.completionNotes?.trim() || undefined,
+          cost: dto.cost === undefined ? undefined : new Prisma.Decimal(dto.cost).toDecimalPlaces(2),
         },
         include: WORK_ORDER_INCLUDE,
       });
 
       await this.syncAssetStatus(tx, workOrder.assetId, dto.status);
+      // A preventive work order moves its schedule on when it is closed.
+      if (workOrder.scheduleId && (dto.status === 'COMPLETED' || dto.status === 'CANCELLED')) {
+        await this.schedules.onWorkOrderClosed(tx, workOrder.scheduleId, dto.status);
+      }
 
       return updated;
     });

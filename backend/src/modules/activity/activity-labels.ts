@@ -54,6 +54,11 @@ export const ACTIVITY_LABELS: Record<string, ActivityLabel> = {
   },
   'POST /assets/:id/check-in': { action: 'ASSET_CHECKED_IN', entityType: 'Asset', summary: ({ res }) => `${res.assetTag} returned, condition ${res.condition}` },
 
+  'POST /maintenance-schedules': { action: 'MAINTENANCE_SCHEDULE_CREATE', entityType: 'MaintenanceSchedule', summary: ({ res }) => `${res.title} (${res.asset?.assetTag})` },
+  'PATCH /maintenance-schedules/:id': { action: 'MAINTENANCE_SCHEDULE_UPDATE', entityType: 'MaintenanceSchedule', summary: ({ res }) => `${res.title} (${res.asset?.assetTag})` },
+  'DELETE /maintenance-schedules/:id': { action: 'MAINTENANCE_SCHEDULE_DELETE', entityType: 'MaintenanceSchedule', summary: ({ res }) => res.title },
+  'POST /maintenance-schedules/generate': { action: 'MAINTENANCE_GENERATE', entityType: 'MaintenanceSchedule', summary: ({ res }) => `${res.created} work order(s) opened` },
+
   'POST /appointments': { action: 'APPOINTMENT_BOOKED', entityType: 'Appointment', summary: ({ res }) => `${res.subject} on ${String(res.date).slice(0, 10)} at ${res.time}` },
   'POST /appointments/:id/cancel': { action: 'APPOINTMENT_CANCELLED', entityType: 'Appointment', summary: ({ res }) => res.subject },
   'POST /appointments/:id/review': {

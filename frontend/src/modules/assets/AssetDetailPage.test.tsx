@@ -2,15 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../test/renderWithProviders';
-import { makeAsset, makeAssignment } from '../../test/fixtures';
+import { makeAsset, makeAssignment, makeSchedule, makeServiceHistory } from '../../test/fixtures';
 import { pickOption } from '../../test/pickOption';
 import { setCurrentRole } from '../../auth/roleStore';
 import { ApiError } from '../../api/client';
 import * as assetsApi from '../../api/assets';
+import * as maintenanceApi from '../../api/maintenance';
 import * as usersApi from '../../api/users';
+import { fireDate } from '../../test/fireDate';
 import { AssetDetailPage } from './AssetDetailPage';
 
 vi.mock('../../api/assets');
+vi.mock('../../api/maintenance');
 vi.mock('../../api/users');
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -43,6 +46,8 @@ describe('AssetDetailPage', () => {
     vi.mocked(assetsApi.getAsset).mockResolvedValue(makeAsset());
     vi.mocked(assetsApi.listAssetAssignments).mockResolvedValue([]);
     vi.mocked(assetsApi.getAssetHistory).mockResolvedValue([]);
+    vi.mocked(assetsApi.getAssetServiceHistory).mockResolvedValue(makeServiceHistory());
+    vi.mocked(maintenanceApi.listSchedules).mockResolvedValue([]);
     vi.mocked(usersApi.listUsers).mockResolvedValue([
       { id: 'u-ann', email: 'ann@acme.test', firstName: 'Ann', lastName: 'Store', phone: null, isActive: true, status: 'ACTIVE', role: null, departmentId: null, department: null, requestedAt: null, rejectionReason: null, createdAt: '' },
     ]);
@@ -368,6 +373,106 @@ describe('AssetDetailPage', () => {
 
       await user.click(within(dialog).getByRole('button', { name: 'Check in' }));
       expect(await screen.findByText('Failed to check in asset')).toBeInTheDocument();
+    });
+  });
+
+  describe('maintenance', () => {
+    it('lists the schedules on the asset, and says so when there are none', async () => {
+      renderWithProviders(<AssetDetailPage />);
+      expect(await screen.findByText('No maintenance scheduled.')).toBeInTheDocument();
+      expect(screen.getByText('No completed maintenance yet.')).toBeInTheDocument();
+      expect(maintenanceApi.listSchedules).toHaveBeenCalledWith({ assetId: 'asset-1' });
+    });
+
+    it('shows each schedule with when it is next due and where it stands', async () => {
+      vi.mocked(maintenanceApi.listSchedules).mockResolvedValue([
+        makeSchedule({ dueStatus: 'OVERDUE', intervalValue: 1, intervalUnit: 'YEARS', title: 'Service' }),
+        makeSchedule({ id: 'sch-2', title: 'Grease bearings', lastCompletedDate: null }),
+      ]);
+
+      renderWithProviders(<AssetDetailPage />);
+
+      expect(await screen.findByText('Service')).toBeInTheDocument();
+      expect(screen.getByText('Every year')).toBeInTheDocument();
+      expect(screen.getByText('OVERDUE')).toBeInTheDocument();
+      expect(screen.getByText('Every 3 months')).toBeInTheDocument();
+      expect(screen.getByText('UPCOMING')).toBeInTheDocument();
+    });
+
+    it('summarises the service history, with parts used and cost', async () => {
+      vi.mocked(assetsApi.getAssetServiceHistory).mockResolvedValue(
+        makeServiceHistory({
+          totals: { count: 2, preventive: 1, cost: '175.50', lastServiceAt: '2026-10-20T09:00:00.000Z' },
+          workOrders: [
+            {
+              id: 'wo-2', organizationId: 'org-1', assetId: 'asset-1', title: 'Quarterly service', description: null, type: 'PREVENTIVE',
+              priority: 'MEDIUM', status: 'COMPLETED', requestedById: 'u1', assignedToId: null, dueDate: null, completedAt: '2026-10-20T09:00:00.000Z',
+              completionNotes: 'Replaced the seal', cost: '125.50', createdAt: '', updatedAt: '', assignedTo: null,
+              stockTransactions: [{ id: 't1', quantity: -2, item: { id: 'i1', sku: 'SEAL', name: 'Seal kit', unitOfMeasure: 'pcs' } }],
+            },
+            {
+              id: 'wo-1', organizationId: 'org-1', assetId: 'asset-1', title: 'Fix leak', description: null, type: 'CORRECTIVE',
+              priority: 'HIGH', status: 'COMPLETED', requestedById: 'u1', assignedToId: null, dueDate: null, completedAt: null,
+              completionNotes: null, cost: null, createdAt: '', updatedAt: '', assignedTo: null, stockTransactions: [],
+            },
+          ],
+        }),
+      );
+
+      renderWithProviders(<AssetDetailPage />);
+
+      expect(await screen.findByText(/2 completed jobs · 1 preventive · total cost 175.50/)).toBeInTheDocument();
+      expect(screen.getByText('Replaced the seal')).toBeInTheDocument();
+      expect(screen.getByText('2 pcs Seal kit')).toBeInTheDocument();
+      expect(screen.getByText('125.50')).toBeInTheDocument();
+      expect(screen.getByText('Preventive')).toBeInTheDocument();
+      expect(screen.getByText('Repair')).toBeInTheDocument();
+    });
+
+    it('uses the singular for a single job', async () => {
+      vi.mocked(assetsApi.getAssetServiceHistory).mockResolvedValue(
+        makeServiceHistory({ totals: { count: 1, preventive: 0, cost: '0.00', lastServiceAt: '2026-10-20T09:00:00.000Z' } }),
+      );
+
+      renderWithProviders(<AssetDetailPage />);
+
+      expect(await screen.findByText(/1 completed job ·/)).toBeInTheDocument();
+    });
+
+    it('lets a manager plan maintenance for this asset', async () => {
+      const user = userEvent.setup();
+      vi.mocked(maintenanceApi.createSchedule).mockResolvedValue(makeSchedule());
+      renderWithProviders(<AssetDetailPage />);
+
+      await user.click(await screen.findByRole('button', { name: 'Schedule maintenance' }));
+      const dialog = await screen.findByRole('dialog', { name: 'New maintenance schedule' });
+      await user.type(within(dialog).getByLabelText(/Task/), 'Grease bearings');
+      fireDate(within(dialog).getByLabelText(/First due/), '2026-12-01');
+      await user.click(within(dialog).getByRole('button', { name: 'Create' }));
+
+      await waitFor(() => {
+        expect(vi.mocked(maintenanceApi.createSchedule).mock.calls[0][0]).toMatchObject({
+          assetId: 'asset-1',
+          title: 'Grease bearings',
+          intervalValue: 1,
+          intervalUnit: 'MONTHS',
+          firstDueDate: '2026-12-01',
+        });
+      });
+    });
+
+    it('does not offer it to people who only look, or for a decommissioned asset', async () => {
+      setCurrentRole('hse');
+      const { unmount } = renderWithProviders(<AssetDetailPage />);
+      await screen.findByRole('heading', { name: 'PUMP-001 — Feed Pump A' });
+      expect(screen.queryByRole('button', { name: 'Schedule maintenance' })).not.toBeInTheDocument();
+      unmount();
+
+      setCurrentRole('admin');
+      vi.mocked(assetsApi.getAsset).mockResolvedValue(makeAsset({ status: 'DECOMMISSIONED' }));
+      renderWithProviders(<AssetDetailPage />);
+      await screen.findByRole('heading', { name: 'PUMP-001 — Feed Pump A' });
+      expect(screen.queryByRole('button', { name: 'Schedule maintenance' })).not.toBeInTheDocument();
     });
   });
 });

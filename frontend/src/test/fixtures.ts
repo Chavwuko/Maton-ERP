@@ -1,6 +1,7 @@
 import type { Session } from '../api/auth';
 import type { Appointment } from '../modules/appointments/types';
 import type { Asset, AssetAssignment } from '../modules/assets/types';
+import type { MaintenanceSchedule, ServiceHistory } from '../modules/maintenance/types';
 import type { User } from '../modules/users/types';
 
 export function makeSession(overrides: Partial<Session> = {}): Session {
@@ -118,3 +119,30 @@ export function makeAssignment(overrides: Partial<AssetAssignment> = {}): AssetA
   };
 }
 
+export function makeSchedule(overrides: Partial<MaintenanceSchedule> = {}): MaintenanceSchedule {
+  return {
+    id: 'sch-1',
+    organizationId: 'org-1',
+    assetId: 'asset-1',
+    title: 'Grease bearings',
+    description: null,
+    intervalValue: 3,
+    intervalUnit: 'MONTHS',
+    basis: 'FIXED',
+    priority: 'MEDIUM',
+    assignedToId: null,
+    leadDays: 7,
+    nextDueDate: '2026-11-15T00:00:00.000Z',
+    lastCompletedDate: '2026-08-15T00:00:00.000Z',
+    active: true,
+    createdById: 'user-1',
+    dueStatus: 'UPCOMING',
+    asset: { id: 'asset-1', assetTag: 'PUMP-001', name: 'Feed Pump A', status: 'ACTIVE' },
+    assignedTo: null,
+    ...overrides,
+  };
+}
+
+export function makeServiceHistory(overrides: Partial<ServiceHistory> = {}): ServiceHistory {
+  return { workOrders: [], totals: { count: 0, preventive: 0, cost: '0.00', lastServiceAt: null }, ...overrides };
+}

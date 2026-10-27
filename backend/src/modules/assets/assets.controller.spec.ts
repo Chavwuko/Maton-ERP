@@ -13,6 +13,7 @@ describe('AssetsController', () => {
       findOne: jest.fn(),
       assignments: jest.fn(),
       history: jest.fn(),
+      serviceHistory: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       checkOut: jest.fn(),
@@ -41,11 +42,13 @@ describe('AssetsController', () => {
     expect(service.findMine).toHaveBeenCalledWith('user-1');
   });
 
-  it('findOne, assignments and history forward the id', () => {
+  it('findOne, assignments, service history and history forward the id', () => {
     controller.findOne('a1');
     controller.assignments('a1');
+    controller.serviceHistory('a1');
     controller.history('a1');
 
+    expect(service.serviceHistory).toHaveBeenCalledWith('a1');
     expect(service.findOne).toHaveBeenCalledWith('a1');
     expect(service.assignments).toHaveBeenCalledWith('a1');
     expect(service.history).toHaveBeenCalledWith('a1');

@@ -1,5 +1,6 @@
 import { apiClient } from './client';
 import type { ActivityEntry } from '../modules/users/activityTypes';
+import type { ServiceHistory } from '../modules/maintenance/types';
 import type { Asset, AssetAssignment, AssetCondition, AssetStatus } from '../modules/assets/types';
 
 export interface AssetFields {
@@ -73,4 +74,8 @@ export function listAssetAssignments(id: string) {
 
 export function getAssetHistory(id: string) {
   return apiClient.get<ActivityEntry[]>(`/assets/${id}/history`);
+}
+
+export function getAssetServiceHistory(id: string) {
+  return apiClient.get<ServiceHistory>(`/assets/${id}/service-history`);
 }

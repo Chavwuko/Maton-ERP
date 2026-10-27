@@ -82,6 +82,22 @@ describe('EmailNotifier', () => {
     );
   });
 
+  it('tells the assignee about a preventive work order, or the maintenance team when nobody is assigned', async () => {
+    const workOrder = { title: 'Grease bearings', assetTag: 'PUMP-1', assetName: 'Pump', dueDate: new Date('2026-11-01') };
+
+    await notifier.scheduledWorkOrder({ ...workOrder, assignee: { email: 'tech@acme.com' } });
+    await notifier.scheduledWorkOrder({ ...workOrder, assignee: null });
+
+    expect(mail.send).toHaveBeenNthCalledWith(
+      1,
+      ['tech@acme.com'],
+      'Preventive maintenance due — Grease bearings (PUMP-1)',
+      expect.stringContaining('Open work orders: /maintenance'),
+    );
+    expect(prisma.user.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { status: 'ACTIVE', role: { name: { in: ['maintenance'] } } } }));
+    expect(mail.send).toHaveBeenNthCalledWith(2, ['boss@acme.com', 'kay@acme.com'], expect.any(String), expect.any(String));
+  });
+
   it('never throws: a failed lookup or send is logged and swallowed', async () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     prisma.user.findMany.mockRejectedValue(new Error('db down'));

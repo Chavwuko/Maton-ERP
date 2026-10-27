@@ -52,4 +52,13 @@ describe('AppNav', () => {
     expect(screen.getByRole('link', { name: 'Appointments' })).toHaveAttribute('href', '/appointments');
     expect(screen.getByRole('link', { name: 'Appointments' })).toHaveAttribute('data-active', 'true');
   });
+
+  it('expands Maintenance into Work orders and Schedules, lighting up only the one you are on', () => {
+    renderWithProviders(<AppNav />, { route: '/maintenance/schedules' });
+
+    expect(screen.getByRole('link', { name: 'Schedules' })).toHaveAttribute('href', '/maintenance/schedules');
+    expect(screen.getByRole('link', { name: 'Schedules' })).toHaveAttribute('data-active', 'true');
+    expect(screen.getByRole('link', { name: 'Work orders' })).toHaveAttribute('href', '/maintenance');
+    expect(screen.getByRole('link', { name: 'Work orders' })).not.toHaveAttribute('data-active', 'true');
+  });
 });

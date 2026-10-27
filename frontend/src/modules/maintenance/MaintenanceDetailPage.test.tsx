@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import { setCurrentRole } from '../../auth/roleStore';
+import { ApiError } from '../../api/client';
 import * as maintenanceApi from '../../api/maintenance';
 import { MaintenanceDetailPage } from './MaintenanceDetailPage';
 import type { WorkOrder } from './types';
@@ -93,5 +94,105 @@ describe('MaintenanceDetailPage', () => {
     expect(screen.queryByRole('button', { name: /OPEN/i })).not.toBeInTheDocument();
     expect(screen.getByText('OPEN')).toBeInTheDocument();
     expect(screen.queryByText('Reassign')).not.toBeInTheDocument();
+  });
+
+  describe('completing', () => {
+    const inProgress = { ...baseWorkOrder, status: 'IN_PROGRESS' as const };
+
+    const startCompleting = async (user: ReturnType<typeof userEvent.setup>) => {
+      await screen.findByText('Replace bearing');
+      await user.click(screen.getByRole('button', { name: /IN PROGRESS/i }));
+      await user.click(await screen.findByText('Move to COMPLETED'));
+      return screen.findByRole('dialog', { name: 'Complete work order' });
+    };
+
+    it('asks what was done and what it cost before completing', async () => {
+      const user = userEvent.setup();
+      vi.mocked(maintenanceApi.getWorkOrder).mockResolvedValue(inProgress);
+      vi.mocked(maintenanceApi.updateWorkOrderStatus).mockResolvedValue({ ...inProgress, status: 'COMPLETED' });
+      renderWithProviders(<MaintenanceDetailPage />);
+
+      const dialog = await startCompleting(user);
+      expect(maintenanceApi.updateWorkOrderStatus).not.toHaveBeenCalled();
+      await user.type(within(dialog).getByLabelText('What was done'), ' Replaced the seal ');
+      await user.type(within(dialog).getByLabelText('Cost'), '125.5');
+      await user.click(within(dialog).getByRole('button', { name: 'Complete' }));
+
+      await waitFor(() => {
+        expect(maintenanceApi.updateWorkOrderStatus).toHaveBeenCalledWith('wo-1', 'COMPLETED', {
+          completionNotes: 'Replaced the seal',
+          cost: 125.5,
+        });
+      });
+      expect(await screen.findByText('Status updated')).toBeInTheDocument();
+    });
+
+    it('lets them complete without either', async () => {
+      const user = userEvent.setup();
+      vi.mocked(maintenanceApi.getWorkOrder).mockResolvedValue(inProgress);
+      vi.mocked(maintenanceApi.updateWorkOrderStatus).mockResolvedValue({ ...inProgress, status: 'COMPLETED' });
+      renderWithProviders(<MaintenanceDetailPage />);
+
+      const dialog = await startCompleting(user);
+      await user.click(within(dialog).getByRole('button', { name: 'Complete' }));
+
+      await waitFor(() => {
+        expect(maintenanceApi.updateWorkOrderStatus).toHaveBeenCalledWith('wo-1', 'COMPLETED', { completionNotes: undefined, cost: undefined });
+      });
+    });
+
+    it('surfaces an error from the server', async () => {
+      const user = userEvent.setup();
+      vi.mocked(maintenanceApi.getWorkOrder).mockResolvedValue(inProgress);
+      vi.mocked(maintenanceApi.updateWorkOrderStatus).mockRejectedValueOnce(new ApiError(400, 'cost must be zero or more'));
+      renderWithProviders(<MaintenanceDetailPage />);
+
+      const dialog = await startCompleting(user);
+      await user.click(within(dialog).getByRole('button', { name: 'Complete' }));
+
+      expect(await screen.findByText('cost must be zero or more')).toBeInTheDocument();
+    });
+  });
+
+  it('shows what was done and what it cost once completed', async () => {
+    vi.mocked(maintenanceApi.getWorkOrder).mockResolvedValue({
+      ...baseWorkOrder,
+      status: 'COMPLETED',
+      completionNotes: 'Replaced the seal',
+      cost: '125.50',
+    });
+
+    renderWithProviders(<MaintenanceDetailPage />);
+
+    expect(await screen.findByText('Replaced the seal')).toBeInTheDocument();
+    expect(screen.getByText('125.50')).toBeInTheDocument();
+  });
+
+  it('shows dashes when a completed one has neither', async () => {
+    vi.mocked(maintenanceApi.getWorkOrder).mockResolvedValue({ ...baseWorkOrder, status: 'COMPLETED', completionNotes: null, cost: null });
+
+    renderWithProviders(<MaintenanceDetailPage />);
+
+    await screen.findByText('What was done');
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('links to the asset, and says when a schedule opened it', async () => {
+    vi.mocked(maintenanceApi.getWorkOrder).mockResolvedValue({ ...baseWorkOrder, type: 'PREVENTIVE', scheduleId: 'sch-1' });
+
+    renderWithProviders(<MaintenanceDetailPage />);
+
+    expect(await screen.findByRole('link', { name: 'View asset' })).toHaveAttribute('href', '/assets/asset-1');
+    expect(screen.getByText('From a schedule')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'From a schedule' })).toHaveAttribute('href', '/maintenance/schedules');
+  });
+
+  it('says nothing about schedules for an ordinary work order', async () => {
+    vi.mocked(maintenanceApi.getWorkOrder).mockResolvedValue(baseWorkOrder);
+
+    renderWithProviders(<MaintenanceDetailPage />);
+
+    await screen.findByText('Replace bearing');
+    expect(screen.queryByText('From a schedule')).not.toBeInTheDocument();
   });
 });
