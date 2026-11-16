@@ -1,7 +1,7 @@
 import { apiClient } from './client';
 import type { ActivityEntry } from '../modules/users/activityTypes';
 import type { ServiceHistory } from '../modules/maintenance/types';
-import type { Asset, AssetAssignment, AssetCondition, AssetStatus } from '../modules/assets/types';
+import type { Asset, AssetAssignment, AssetCondition, AssetStatus, AssetValuation, DepreciationMethod, ValuationReport } from '../modules/assets/types';
 
 export interface AssetFields {
   location?: string | null;
@@ -16,6 +16,10 @@ export interface AssetFields {
   condition?: AssetCondition;
   notes?: string | null;
   departmentId?: string | null;
+  depreciationMethod?: DepreciationMethod;
+  usefulLifeMonths?: number | null;
+  salvageValue?: number | null;
+  depreciationStartDate?: string | null;
 }
 
 export interface AssetFilters {
@@ -78,4 +82,17 @@ export function getAssetHistory(id: string) {
 
 export function getAssetServiceHistory(id: string) {
   return apiClient.get<ServiceHistory>(`/assets/${id}/service-history`);
+}
+
+export function getAssetValuation(id: string, asOf?: string) {
+  return apiClient.get<AssetValuation>(`/assets/${id}/valuation${asOf ? `?asOf=${asOf}` : ''}`);
+}
+
+export function getValuationReport(filters: { organizationId?: string; asOf?: string; includeDecommissioned?: boolean } = {}) {
+  const params = new URLSearchParams();
+  if (filters.organizationId) params.set('organizationId', filters.organizationId);
+  if (filters.asOf) params.set('asOf', filters.asOf);
+  if (filters.includeDecommissioned) params.set('includeDecommissioned', 'true');
+  const qs = params.toString();
+  return apiClient.get<ValuationReport>(`/assets/valuation${qs ? `?${qs}` : ''}`);
 }

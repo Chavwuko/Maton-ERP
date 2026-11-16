@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../test/renderWithProviders';
-import { makeAsset, makeAssignment, makeSchedule, makeServiceHistory } from '../../test/fixtures';
+import { makeAsset, makeAssignment, makeSchedule, makeServiceHistory, makeValuation } from '../../test/fixtures';
 import { pickOption } from '../../test/pickOption';
 import { setCurrentRole } from '../../auth/roleStore';
 import { ApiError } from '../../api/client';
@@ -47,6 +47,7 @@ describe('AssetDetailPage', () => {
     vi.mocked(assetsApi.listAssetAssignments).mockResolvedValue([]);
     vi.mocked(assetsApi.getAssetHistory).mockResolvedValue([]);
     vi.mocked(assetsApi.getAssetServiceHistory).mockResolvedValue(makeServiceHistory());
+    vi.mocked(assetsApi.getAssetValuation).mockResolvedValue(makeValuation());
     vi.mocked(maintenanceApi.listSchedules).mockResolvedValue([]);
     vi.mocked(usersApi.listUsers).mockResolvedValue([
       { id: 'u-ann', email: 'ann@acme.test', firstName: 'Ann', lastName: 'Store', phone: null, isActive: true, status: 'ACTIVE', role: null, departmentId: null, department: null, requestedAt: null, rejectionReason: null, createdAt: '' },
@@ -473,6 +474,71 @@ describe('AssetDetailPage', () => {
       renderWithProviders(<AssetDetailPage />);
       await screen.findByRole('heading', { name: 'PUMP-001 — Feed Pump A' });
       expect(screen.queryByRole('button', { name: 'Schedule maintenance' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('valuation', () => {
+    const depreciated = makeValuation({
+      method: 'STRAIGHT_LINE',
+      usefulLifeMonths: 24,
+      monthsElapsed: 12,
+      cost: '12000.00',
+      accumulatedDepreciation: '5000.00',
+      bookValue: '7000.00',
+      schedule: [
+        { year: 1, endsOn: '2027-01-15T00:00:00.000Z', opening: '12000.00', depreciation: '5000.00', closing: '7000.00' },
+        { year: 2, endsOn: '2028-01-15T00:00:00.000Z', opening: '7000.00', depreciation: '5000.00', closing: '2000.00' },
+      ],
+    });
+
+    it('shows what it is worth today and the year-by-year schedule', async () => {
+      vi.mocked(assetsApi.getAssetValuation).mockResolvedValue(depreciated);
+
+      renderWithProviders(<AssetDetailPage />);
+
+      expect(await screen.findByText('Book value today')).toBeInTheDocument();
+      expect(screen.getByText('7,000.00', { selector: 'p' })).toBeInTheDocument();
+      expect(screen.getByText('Accumulated depreciation')).toBeInTheDocument();
+      expect(screen.getByText('5,000.00', { selector: 'p' })).toBeInTheDocument();
+      expect(screen.getByText('Straight line, 12 of 24 months.')).toBeInTheDocument();
+      const schedule = within(screen.getAllByRole('table')[1]);
+      expect(schedule.getByText('Closing')).toBeInTheDocument();
+      expect(schedule.getByText('2,000.00')).toBeInTheDocument();
+      expect(schedule.getByText(new Date(2028, 0, 15).toLocaleDateString())).toBeInTheDocument();
+    });
+
+    it('says so when it is fully depreciated', async () => {
+      vi.mocked(assetsApi.getAssetValuation).mockResolvedValue({ ...depreciated, monthsElapsed: 24, fullyDepreciated: true, method: 'DECLINING_BALANCE' });
+
+      renderWithProviders(<AssetDetailPage />);
+
+      expect(await screen.findByText('Declining balance, 24 of 24 months · fully depreciated.')).toBeInTheDocument();
+    });
+
+    it('carries an asset that is not depreciated at its cost', async () => {
+      renderWithProviders(<AssetDetailPage />);
+
+      expect(await screen.findByText('Not depreciated: carried at its purchase cost.')).toBeInTheDocument();
+      expect(screen.getByText('Book value today')).toBeInTheDocument();
+    });
+
+    it('cannot value an asset without a cost', async () => {
+      vi.mocked(assetsApi.getAssetValuation).mockResolvedValue(makeValuation({ cost: null, bookValue: null, accumulatedDepreciation: null }));
+
+      renderWithProviders(<AssetDetailPage />);
+
+      expect(await screen.findByText('No purchase cost is recorded, so this asset cannot be valued.')).toBeInTheDocument();
+      expect(screen.queryByText('Book value today')).not.toBeInTheDocument();
+    });
+
+    it('is not shown to the staff role, and not even asked for', async () => {
+      setCurrentRole('staff');
+
+      renderWithProviders(<AssetDetailPage />);
+
+      await screen.findByRole('heading', { name: 'PUMP-001 — Feed Pump A' });
+      expect(screen.queryByText('Valuation')).not.toBeInTheDocument();
+      expect(assetsApi.getAssetValuation).not.toHaveBeenCalled();
     });
   });
 });

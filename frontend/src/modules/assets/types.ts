@@ -2,6 +2,7 @@ import type { WorkOrder } from '../maintenance/types';
 
 export type AssetStatus = 'ACTIVE' | 'UNDER_MAINTENANCE' | 'DECOMMISSIONED';
 export type AssetCondition = 'NEW' | 'GOOD' | 'FAIR' | 'POOR';
+export type DepreciationMethod = 'NONE' | 'STRAIGHT_LINE' | 'DECLINING_BALANCE';
 
 interface Person {
   id: string;
@@ -51,6 +52,11 @@ export interface Asset {
   condition: AssetCondition;
   notes: string | null;
   departmentId: string | null;
+  depreciationMethod: DepreciationMethod;
+  usefulLifeMonths: number | null;
+  // Hidden from the staff role, like the purchase cost.
+  salvageValue?: string | null;
+  depreciationStartDate: string | null;
   createdAt: string;
   updatedAt: string;
   vendor?: { id: string; name: string } | null;
@@ -67,6 +73,54 @@ export const ASSET_STATUS_COLORS: Record<AssetStatus, string> = {
   UNDER_MAINTENANCE: 'yellow',
   DECOMMISSIONED: 'gray',
 };
+
+export const DEPRECIATION_METHODS: { value: DepreciationMethod; label: string; description: string }[] = [
+  { value: 'NONE', label: 'Not depreciated', description: 'Carried at its purchase cost.' },
+  { value: 'STRAIGHT_LINE', label: 'Straight line', description: 'The same amount off every month.' },
+  { value: 'DECLINING_BALANCE', label: 'Declining balance', description: 'More off early on, less later (double-declining).' },
+];
+
+// What an asset is worth on the books on a day, and how it gets there.
+// Decimal columns arrive as strings; null means "no cost to value".
+export interface AssetValuation {
+  asOf: string;
+  method: DepreciationMethod;
+  usefulLifeMonths: number | null;
+  salvageValue: string | null;
+  depreciationStartDate: string | null;
+  cost: string | null;
+  accumulatedDepreciation: string | null;
+  bookValue: string | null;
+  monthsElapsed: number;
+  fullyDepreciated: boolean;
+  schedule: { year: number; endsOn: string; opening: string; depreciation: string; closing: string }[];
+}
+
+interface ValuationFigures {
+  count: number;
+  cost: string;
+  accumulatedDepreciation: string;
+  bookValue: string;
+}
+
+export interface ValuationReport {
+  asOf: string;
+  rows: {
+    id: string;
+    assetTag: string;
+    name: string;
+    category: string;
+    status: AssetStatus;
+    purchaseDate: string | null;
+    method: DepreciationMethod;
+    cost: string | null;
+    accumulatedDepreciation: string | null;
+    bookValue: string | null;
+    monthsElapsed: number;
+    fullyDepreciated: boolean;
+  }[];
+  totals: ValuationFigures & { notValued: number; byCategory: (ValuationFigures & { category: string })[] };
+}
 
 export const ASSET_CONDITIONS: AssetCondition[] = ['NEW', 'GOOD', 'FAIR', 'POOR'];
 

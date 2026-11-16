@@ -553,4 +553,276 @@ describe('AssetsService', () => {
       await expect(service.history('x')).rejects.toThrow(NotFoundException);
     });
   });
+
+  describe('depreciation settings', () => {
+    const dec = (value: string) => new Prisma.Decimal(value);
+    const settings = { purchaseCost: 12000, purchaseDate: '2026-01-15', depreciationMethod: 'STRAIGHT_LINE', usefulLifeMonths: 60 };
+
+    describe('creating', () => {
+      beforeEach(() => {
+        prisma.asset.create.mockResolvedValue({ id: 'a1', assignments: [] } as never);
+      });
+
+      it('stores the method, life, salvage value and start date', async () => {
+        await service.create({ ...base, ...settings, salvageValue: 2000.456, depreciationStartDate: '2026-02-01' });
+
+        expect(prisma.asset.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              depreciationMethod: 'STRAIGHT_LINE',
+              usefulLifeMonths: 60,
+              salvageValue: dec('2000.46'),
+              depreciationStartDate: new Date('2026-02-01T00:00:00.000Z'),
+            }),
+          }),
+        );
+      });
+
+      it('starts from the purchase date when no start date is given', async () => {
+        await expect(service.create({ ...base, ...settings })).resolves.toBeDefined();
+      });
+
+      it('lets an asset that is not depreciated leave the rest empty, and clears blanks', async () => {
+        await service.create({ ...base, depreciationMethod: 'NONE', usefulLifeMonths: '' as never, salvageValue: null as never });
+
+        expect(prisma.asset.create).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ depreciationMethod: 'NONE', usefulLifeMonths: null, salvageValue: null }) }),
+        );
+      });
+
+      it.each([
+        [{ depreciationMethod: 'MAGIC' }, 'depreciationMethod must be one of'],
+        [{ usefulLifeMonths: 0 }, 'usefulLifeMonths must be a whole number from 1 to 600'],
+        [{ usefulLifeMonths: 601 }, 'usefulLifeMonths must be a whole number from 1 to 600'],
+        [{ usefulLifeMonths: 1.5 }, 'usefulLifeMonths must be a whole number from 1 to 600'],
+        [{ salvageValue: -1 }, 'salvageValue must be zero or more'],
+        [{ depreciationStartDate: 'soon' }, 'depreciationStartDate must be a date'],
+        [{ purchaseCost: undefined }, 'Depreciation needs a purchase cost'],
+        [{ usefulLifeMonths: undefined }, 'Depreciation needs a useful life in months'],
+        [{ purchaseDate: undefined }, 'Depreciation needs a start date'],
+        [{ salvageValue: 13000 }, 'salvage value cannot be more than the purchase cost'],
+      ])('refuses %j', async (change, message) => {
+        await expect(service.create({ ...base, ...settings, ...change })).rejects.toThrow(message);
+        expect(prisma.asset.create).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('updating', () => {
+      const depreciated = (overrides = {}) =>
+        stored({
+          purchaseCost: dec('1000'),
+          purchaseDate: new Date('2026-01-15T00:00:00.000Z'),
+          depreciationMethod: 'STRAIGHT_LINE',
+          usefulLifeMonths: 12,
+          salvageValue: null,
+          depreciationStartDate: new Date('2026-02-01T00:00:00.000Z'),
+          ...overrides,
+        });
+
+      beforeEach(() => {
+        prisma.asset.findUnique.mockResolvedValue(depreciated() as never);
+        prisma.asset.update.mockResolvedValue({ id: 'a1', assignments: [] } as never);
+      });
+
+      it('leaves a complete setup alone when something else changes', async () => {
+        await service.update('a1', { name: 'New name' });
+
+        expect(prisma.asset.update).toHaveBeenCalledWith(expect.objectContaining({ data: { name: 'New name' } }));
+      });
+
+      it('switches the method on an asset that already has a cost and a life', async () => {
+        await service.update('a1', { depreciationMethod: 'DECLINING_BALANCE', salvageValue: 100 });
+
+        expect(prisma.asset.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: { depreciationMethod: 'DECLINING_BALANCE', salvageValue: dec('100') } }),
+        );
+      });
+
+      it('starts from the purchase date once the start date is cleared', async () => {
+        await expect(service.update('a1', { depreciationStartDate: null })).resolves.toBeDefined();
+        expect(prisma.asset.update).toHaveBeenCalledWith(expect.objectContaining({ data: { depreciationStartDate: null } }));
+      });
+
+      it('falls back to the purchase date when there was never a start date', async () => {
+        prisma.asset.findUnique.mockResolvedValue(depreciated({ depreciationStartDate: null }) as never);
+
+        await expect(service.update('a1', { name: 'X' })).resolves.toBeDefined();
+      });
+
+      it('checks the result, not just what was sent', async () => {
+        await expect(service.update('a1', { purchaseCost: null })).rejects.toThrow('Depreciation needs a purchase cost');
+        await expect(service.update('a1', { usefulLifeMonths: null })).rejects.toThrow('Depreciation needs a useful life');
+        await expect(service.update('a1', { purchaseCost: 50 })).resolves.toBeDefined();
+
+        prisma.asset.findUnique.mockResolvedValue(depreciated({ depreciationStartDate: null, purchaseDate: null }) as never);
+        await expect(service.update('a1', { name: 'X' })).rejects.toThrow('Depreciation needs a start date');
+
+        prisma.asset.findUnique.mockResolvedValue(depreciated({ salvageValue: dec('800') }) as never);
+        await expect(service.update('a1', { purchaseCost: 500 })).rejects.toThrow('salvage value cannot be more');
+        expect(prisma.asset.update).toHaveBeenCalledTimes(1);
+      });
+
+      it('lets depreciation be switched off along with its cost', async () => {
+        await expect(service.update('a1', { depreciationMethod: 'NONE', purchaseCost: null })).resolves.toBeDefined();
+      });
+    });
+  });
+
+  describe('valuation', () => {
+    const dec = (value: string) => new Prisma.Decimal(value);
+    const priced = (overrides = {}) => ({
+      id: 'a1',
+      assetTag: 'PUMP-001',
+      name: 'Pump',
+      category: 'Rotating',
+      status: 'ACTIVE',
+      purchaseDate: new Date('2026-01-15T00:00:00.000Z'),
+      purchaseCost: dec('12000'),
+      depreciationMethod: 'STRAIGHT_LINE',
+      usefulLifeMonths: 60,
+      salvageValue: dec('2000'),
+      depreciationStartDate: null,
+      ...overrides,
+    });
+
+    beforeEach(() => {
+      prisma.appSetting.findMany.mockResolvedValue([]);
+    });
+
+    describe('one asset', () => {
+      it('gives the book value on a day, and the year-by-year schedule', async () => {
+        prisma.asset.findUnique.mockResolvedValue(priced() as never);
+
+        const result = await service.valuation('a1', '2027-01-15');
+
+        expect(result).toMatchObject({
+          asOf: '2027-01-15',
+          method: 'STRAIGHT_LINE',
+          usefulLifeMonths: 60,
+          monthsElapsed: 12,
+          fullyDepreciated: false,
+          depreciationStartDate: new Date('2026-01-15T00:00:00.000Z'),
+        });
+        expect(result.cost?.toNumber()).toBe(12000);
+        expect(result.accumulatedDepreciation?.toNumber()).toBe(2000);
+        expect(result.bookValue?.toNumber()).toBe(10000);
+        expect(result.schedule).toHaveLength(5);
+      });
+
+      it('starts from the depreciation start date when there is one', async () => {
+        prisma.asset.findUnique.mockResolvedValue(priced({ depreciationStartDate: new Date('2026-07-01T00:00:00.000Z') }) as never);
+
+        const result = await service.valuation('a1', '2027-01-01');
+
+        expect(result.monthsElapsed).toBe(6);
+      });
+
+      it('is worth its cost when it is not depreciated, with no schedule', async () => {
+        prisma.asset.findUnique.mockResolvedValue(priced({ depreciationMethod: 'NONE' }) as never);
+
+        const result = await service.valuation('a1', '2030-01-01');
+
+        expect(result.bookValue?.toNumber()).toBe(12000);
+        expect(result.accumulatedDepreciation?.toNumber()).toBe(0);
+        expect(result.schedule).toEqual([]);
+        expect(result.depreciationStartDate).toBeNull();
+      });
+
+      it('cannot be valued without a cost, and treats a half-finished setup as not depreciated', async () => {
+        prisma.asset.findUnique.mockResolvedValueOnce(priced({ purchaseCost: null }) as never);
+        await expect(service.valuation('a1', '2027-01-01')).resolves.toMatchObject({ cost: null, bookValue: null, accumulatedDepreciation: null });
+
+        prisma.asset.findUnique.mockResolvedValueOnce(priced({ usefulLifeMonths: null }) as never);
+        await expect(service.valuation('a1', '2027-01-01')).resolves.toMatchObject({ schedule: [] });
+
+        prisma.asset.findUnique.mockResolvedValueOnce(priced({ purchaseDate: null }) as never);
+        await expect(service.valuation('a1', '2027-01-01')).resolves.toMatchObject({ schedule: [] });
+      });
+
+      it('with no salvage value writes the whole cost off', async () => {
+        prisma.asset.findUnique.mockResolvedValue(priced({ salvageValue: null, usefulLifeMonths: 12 }) as never);
+
+        const result = await service.valuation('a1', '2030-01-01');
+
+        expect(result.bookValue?.toNumber()).toBe(0);
+        expect(result.fullyDepreciated).toBe(true);
+      });
+
+      it('uses today, in the store’s time zone, when no day is given', async () => {
+        jest.useFakeTimers({
+          now: new Date('2027-01-14T23:30:00.000Z'),
+          doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'queueMicrotask', 'hrtime', 'performance'],
+        });
+        prisma.asset.findUnique.mockResolvedValue(priced() as never);
+
+        // 23:30 UTC on the 14th is already the 15th in Lagos.
+        const result = await service.valuation('a1');
+        const blank = await service.valuation('a1', '');
+        jest.useRealTimers();
+
+        expect(result.asOf).toBe('2027-01-15');
+        expect(result.monthsElapsed).toBe(12);
+        expect(blank.asOf).toBe('2027-01-15');
+      });
+
+      it('404s for an unknown asset and 400s for a bad day', async () => {
+        prisma.asset.findUnique.mockResolvedValueOnce(null);
+        await expect(service.valuation('x')).rejects.toThrow(NotFoundException);
+
+        prisma.asset.findUnique.mockResolvedValueOnce(priced() as never);
+        await expect(service.valuation('a1', '15/01/2027')).rejects.toThrow('asOf must be a date');
+      });
+    });
+
+    describe('the register', () => {
+      it('values every asset and totals them overall and by category', async () => {
+        prisma.asset.findMany.mockResolvedValue([
+          priced({ id: 'a1', assetTag: 'A', category: 'Rotating' }),
+          priced({ id: 'a2', assetTag: 'B', category: 'Rotating', depreciationMethod: 'NONE', purchaseCost: dec('500') }),
+          priced({ id: 'a3', assetTag: 'C', category: 'Vehicles', purchaseCost: dec('6000'), usefulLifeMonths: 12, salvageValue: null }),
+          priced({ id: 'a4', assetTag: 'D', category: 'Vehicles', purchaseCost: null }),
+        ] as never);
+
+        const report = await service.valuationReport({ asOf: '2027-01-15' });
+
+        expect(report.rows.map((row) => [row.assetTag, row.bookValue?.toNumber() ?? null])).toEqual([
+          ['A', 10000],
+          ['B', 500],
+          ['C', 0],
+          ['D', null],
+        ]);
+        expect(report.totals.count).toBe(3);
+        expect(report.totals.cost.toNumber()).toBe(18500);
+        expect(report.totals.accumulatedDepreciation.toNumber()).toBe(8000);
+        expect(report.totals.bookValue.toNumber()).toBe(10500);
+        expect(report.totals.notValued).toBe(1);
+        expect(report.totals.byCategory.map((row) => [row.category, row.count, row.bookValue.toNumber()])).toEqual([
+          ['Rotating', 2, 10500],
+          ['Vehicles', 1, 0],
+        ]);
+      });
+
+      it('leaves out decommissioned assets unless asked, and can be limited to one organization', async () => {
+        prisma.asset.findMany.mockResolvedValue([]);
+
+        await service.valuationReport({ organizationId: 'org-1', asOf: '2027-01-15' });
+        await service.valuationReport({ asOf: '2027-01-15', includeDecommissioned: 'true' });
+
+        expect(prisma.asset.findMany).toHaveBeenNthCalledWith(
+          1,
+          expect.objectContaining({ where: { organizationId: 'org-1', status: { not: 'DECOMMISSIONED' } } }),
+        );
+        expect(prisma.asset.findMany).toHaveBeenNthCalledWith(2, expect.objectContaining({ where: { organizationId: undefined, status: undefined } }));
+      });
+
+      it('reports zero totals for an empty register, and rejects a bad day', async () => {
+        prisma.asset.findMany.mockResolvedValue([]);
+
+        const report = await service.valuationReport({ asOf: '2027-01-15' });
+
+        expect(report.totals).toMatchObject({ count: 0, notValued: 0, byCategory: [] });
+        await expect(service.valuationReport({ asOf: 'tomorrow' })).rejects.toThrow('asOf must be a date');
+      });
+    });
+  });
 });

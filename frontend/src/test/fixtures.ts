@@ -1,6 +1,6 @@
 import type { Session } from '../api/auth';
 import type { Appointment } from '../modules/appointments/types';
-import type { Asset, AssetAssignment } from '../modules/assets/types';
+import type { Asset, AssetAssignment, AssetValuation } from '../modules/assets/types';
 import type { MaintenanceSchedule, ServiceHistory } from '../modules/maintenance/types';
 import type { User } from '../modules/users/types';
 
@@ -90,6 +90,10 @@ export function makeAsset(overrides: Partial<Asset> = {}): Asset {
     condition: 'GOOD',
     notes: null,
     departmentId: 'dept-1',
+    depreciationMethod: 'NONE',
+    usefulLifeMonths: null,
+    salvageValue: null,
+    depreciationStartDate: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     vendor: { id: 'ven-1', name: 'Apex Supplies' },
@@ -145,4 +149,22 @@ export function makeSchedule(overrides: Partial<MaintenanceSchedule> = {}): Main
 
 export function makeServiceHistory(overrides: Partial<ServiceHistory> = {}): ServiceHistory {
   return { workOrders: [], totals: { count: 0, preventive: 0, cost: '0.00', lastServiceAt: null }, ...overrides };
+}
+
+// An asset that is not depreciated: worth what it cost.
+export function makeValuation(overrides: Partial<AssetValuation> = {}): AssetValuation {
+  return {
+    asOf: '2027-01-15',
+    method: 'NONE',
+    usefulLifeMonths: null,
+    salvageValue: null,
+    depreciationStartDate: null,
+    cost: '1500.50',
+    accumulatedDepreciation: '0',
+    bookValue: '1500.50',
+    monthsElapsed: 0,
+    fullyDepreciated: false,
+    schedule: [],
+    ...overrides,
+  };
 }

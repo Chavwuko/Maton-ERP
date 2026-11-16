@@ -3,7 +3,7 @@ import type { UseFormReturnType } from '@mantine/form';
 import type { AssetFields } from '../../api/assets';
 import { DepartmentSelect } from '../../components/DepartmentSelect';
 import { VendorSelect } from '../../components/VendorSelect';
-import { ASSET_CONDITIONS, type Asset, type AssetCondition } from './types';
+import { ASSET_CONDITIONS, DEPRECIATION_METHODS, type Asset, type AssetCondition, type DepreciationMethod } from './types';
 
 export interface AssetFormValues {
   assetTag: string;
@@ -20,6 +20,10 @@ export interface AssetFormValues {
   condition: AssetCondition;
   notes: string;
   departmentId: string;
+  depreciationMethod: DepreciationMethod;
+  usefulLifeMonths: number | string;
+  salvageValue: number | string;
+  depreciationStartDate: string;
 }
 
 export const emptyAssetForm: AssetFormValues = {
@@ -37,6 +41,10 @@ export const emptyAssetForm: AssetFormValues = {
   condition: 'GOOD',
   notes: '',
   departmentId: '',
+  depreciationMethod: 'NONE',
+  usefulLifeMonths: '',
+  salvageValue: '',
+  depreciationStartDate: '',
 };
 
 export function assetToForm(asset: Asset): AssetFormValues {
@@ -55,6 +63,10 @@ export function assetToForm(asset: Asset): AssetFormValues {
     condition: asset.condition,
     notes: asset.notes ?? '',
     departmentId: asset.departmentId ?? '',
+    depreciationMethod: asset.depreciationMethod,
+    usefulLifeMonths: asset.usefulLifeMonths ?? '',
+    salvageValue: asset.salvageValue == null ? '' : Number(asset.salvageValue),
+    depreciationStartDate: asset.depreciationStartDate?.slice(0, 10) ?? '',
   };
 }
 
@@ -74,6 +86,10 @@ export function formToFields(values: AssetFormValues): AssetFields {
     condition: values.condition,
     notes: blank(values.notes),
     departmentId: values.departmentId || null,
+    depreciationMethod: values.depreciationMethod,
+    usefulLifeMonths: values.usefulLifeMonths === '' ? null : Number(values.usefulLifeMonths),
+    salvageValue: values.salvageValue === '' ? null : Number(values.salvageValue),
+    depreciationStartDate: values.depreciationStartDate || null,
   };
 }
 
@@ -87,6 +103,18 @@ export const validateAssetForm = {
   category: (value: string) => (value.trim() ? null : 'Category is required'),
   warrantyExpiry: (value: string, values: AssetFormValues) =>
     value && values.purchaseDate && value < values.purchaseDate ? 'The warranty cannot expire before the purchase date' : null,
+  // Once a method is chosen, the book value needs a cost, a life and a start.
+  purchaseCost: (value: number | string, values: AssetFormValues) =>
+    values.depreciationMethod !== 'NONE' && value === '' ? 'Needed to depreciate the asset' : null,
+  usefulLifeMonths: (value: number | string, values: AssetFormValues) => {
+    if (values.depreciationMethod === 'NONE') return null;
+    const months = Number(value);
+    return value !== '' && Number.isInteger(months) && months >= 1 && months <= 600 ? null : 'Enter a whole number of months, 1 to 600';
+  },
+  salvageValue: (value: number | string, values: AssetFormValues) =>
+    value !== '' && values.purchaseCost !== '' && Number(value) > Number(values.purchaseCost) ? 'Cannot be more than the purchase cost' : null,
+  depreciationStartDate: (value: string, values: AssetFormValues) =>
+    values.depreciationMethod !== 'NONE' && !value && !values.purchaseDate ? 'Set a start date, or a purchase date to start from' : null,
 };
 
 // Every field of the asset record, shared by "New asset" and "Edit asset".
@@ -118,6 +146,34 @@ export function AssetFormFields({ form }: { form: UseFormReturnType<AssetFormVal
       <VendorSelect label="Supplier" clearable {...form.getInputProps('vendorId')} />
       <TextInput type="date" label="Warranty expires" {...form.getInputProps('warrantyExpiry')} />
       <Textarea label="Notes" {...form.getInputProps('notes')} />
+      <Select
+        label="Depreciation"
+        description={DEPRECIATION_METHODS.find((method) => method.value === form.values.depreciationMethod)?.description}
+        data={DEPRECIATION_METHODS.map(({ value, label }) => ({ value, label }))}
+        allowDeselect={false}
+        {...form.getInputProps('depreciationMethod')}
+      />
+      {form.values.depreciationMethod !== 'NONE' && (
+        <>
+          <Group grow align="flex-start">
+            <NumberInput label="Useful life (months)" min={1} max={600} allowDecimal={false} required {...form.getInputProps('usefulLifeMonths')} />
+            <NumberInput
+              label="Salvage value"
+              description="Worth at the end of its life"
+              min={0}
+              decimalScale={2}
+              thousandSeparator=","
+              {...form.getInputProps('salvageValue')}
+            />
+          </Group>
+          <TextInput
+            type="date"
+            label="Depreciation starts"
+            description="Leave empty to start from the purchase date"
+            {...form.getInputProps('depreciationStartDate')}
+          />
+        </>
+      )}
     </>
   );
 }

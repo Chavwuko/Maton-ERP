@@ -165,9 +165,54 @@ describe('AssetsListPage', () => {
           name: 'Backup Generator',
           category: 'Electrical',
           condition: 'GOOD',
+          depreciationMethod: 'NONE',
         });
       });
       expect(await screen.findByText('Asset created')).toBeInTheDocument();
+    });
+
+    it('asks for the life, salvage value and start only once a depreciation method is chosen', async () => {
+      const user = userEvent.setup();
+      vi.mocked(assetsApi.createAsset).mockResolvedValue(pump);
+      const dialog = await openForm(user);
+      const fill = async (label: string, text: string) => {
+        await user.click(within(dialog).getByLabelText(label, { exact: false }));
+        await user.paste(text);
+      };
+
+      expect(within(dialog).queryByLabelText('Useful life (months)', { exact: false })).not.toBeInTheDocument();
+      await fill('Asset tag', 'GEN-3');
+      await fill('Name', 'Generator');
+      await fill('Category', 'Electrical');
+      const method = within(dialog).getAllByLabelText('Depreciation').find((el) => el.tagName === 'INPUT')!;
+      await pickOption(user, method, 'Straight line');
+      await user.click(within(dialog).getByRole('button', { name: 'Create' }));
+
+      expect(await within(dialog).findByText('Needed to depreciate the asset')).toBeInTheDocument();
+      expect(within(dialog).getByText('Enter a whole number of months, 1 to 600')).toBeInTheDocument();
+      expect(within(dialog).getByText('Set a start date, or a purchase date to start from')).toBeInTheDocument();
+      expect(assetsApi.createAsset).not.toHaveBeenCalled();
+
+      await fill('Purchase cost', '12000');
+      await fill('Useful life', '60');
+      await fill('Salvage value', '13000');
+      await fill('Purchase date', '2026-01-15');
+      await user.click(within(dialog).getByRole('button', { name: 'Create' }));
+      expect(await within(dialog).findByText('Cannot be more than the purchase cost')).toBeInTheDocument();
+
+      await user.clear(within(dialog).getByLabelText('Salvage value', { exact: false }));
+      await fill('Salvage value', '2000');
+      await user.click(within(dialog).getByRole('button', { name: 'Create' }));
+
+      await waitFor(() => {
+        expect(vi.mocked(assetsApi.createAsset).mock.calls[0][0]).toMatchObject({
+          depreciationMethod: 'STRAIGHT_LINE',
+          usefulLifeMonths: 60,
+          salvageValue: 2000,
+          purchaseCost: 12000,
+          purchaseDate: '2026-01-15',
+        });
+      });
     });
 
     it('sends the full record when it is filled in', async () => {
@@ -202,6 +247,7 @@ describe('AssetsListPage', () => {
           name: 'Booster Pump',
           category: 'Rotating',
           condition: 'NEW',
+          depreciationMethod: 'NONE',
           location: 'Bay 1',
           departmentId: 'dept-1',
           make: 'Grundfos',

@@ -20,7 +20,14 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Organizations', path: '/organizations' },
   { label: 'Document Control', path: '/documents' },
   { label: 'Project Control', path: '/projects' },
-  { label: 'Assets', path: '/assets' },
+  {
+    label: 'Assets',
+    path: '/assets',
+    children: [
+      { label: 'Register', path: '/assets', exact: true },
+      { label: 'Valuation', path: '/assets/valuation' },
+    ],
+  },
   {
     label: 'Maintenance',
     path: '/maintenance',

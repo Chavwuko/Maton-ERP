@@ -226,11 +226,45 @@ whoever holds it). The purchase cost is hidden from the `staff` role.
   `GET /assets/:id/history` (admin/maintenance) — every change made to the
   asset, taken from the activity log.
 
+### Depreciation and valuation
+
+An asset can be depreciated so the register shows what it is worth on the
+books. Nothing is posted: book value is worked out on demand from the asset's
+own settings, so changing them re-values it at once.
+
+- Settings on the asset (create or `PATCH /assets/:id`): `depreciationMethod`
+  (`NONE` by default, `STRAIGHT_LINE` or `DECLINING_BALANCE`),
+  `usefulLifeMonths` (1 to 600), `salvageValue` (empty means zero) and
+  `depreciationStartDate` (empty means the purchase date). Once a method is
+  chosen the asset needs a purchase cost, a life, and a start or purchase date,
+  and the salvage value cannot exceed the cost; the check is against the asset
+  as it will be after the edit, so clearing the cost of a depreciating asset is
+  refused.
+- **Straight line**: the same amount off every month, from cost to salvage.
+  **Declining balance**: double the straight-line rate on what is left each
+  month, switching to straight line over the remaining months once that writes
+  off more, so it never goes below salvage and ends exactly on it. Amounts are
+  rounded to the cent each month, so the charges add up exactly. A month counts
+  once its day has come round (start 15 Jan, so 1 month on 15 Feb).
+- `GET /assets/:id/valuation?asOf=YYYY-MM-DD` (default today in the store's
+  time zone) — `cost`, `accumulatedDepreciation`, `bookValue`, `monthsElapsed`,
+  `fullyDepreciated` and a `schedule` of one row per year (opening, charge,
+  closing). An asset that is not depreciated is carried at its cost; one with no
+  cost has `null` values.
+- `GET /assets/valuation?organizationId?&asOf?&includeDecommissioned?` — the
+  register valued: a row per asset, totals, totals by category, and `notValued`
+  (assets with no purchase cost). Decommissioned assets are left out unless
+  asked for.
+- Both valuation endpoints, and `salvageValue` on asset responses, are closed
+  to the `staff` role like every other cost.
+
 **Frontend**: `/assets` has search, status and condition filters and an
 "Assigned to me" switch, with a full "New asset" form. An asset's page shows
 the whole record, who holds it, the custody history, work orders and (for
 admin/maintenance) the change history, with Edit, Check out and Check in; see
-the Maintenance module for its schedules and service history.
+the Maintenance module for its schedules and service history, and its book value
+and depreciation schedule. Assets > Valuation (`/assets/valuation`) values the whole
+register for any day.
 
 ## Maintenance module
 

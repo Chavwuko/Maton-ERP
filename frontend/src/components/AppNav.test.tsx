@@ -46,6 +46,15 @@ describe('AppNav', () => {
     expect(screen.getByRole('link', { name: 'Items' })).not.toHaveAttribute('data-active', 'true');
   });
 
+  it('expands Assets into Register and Valuation, lighting up only the one you are on', () => {
+    renderWithProviders(<AppNav />, { route: '/assets/valuation' });
+
+    expect(screen.getByRole('link', { name: 'Valuation' })).toHaveAttribute('href', '/assets/valuation');
+    expect(screen.getByRole('link', { name: 'Valuation' })).toHaveAttribute('data-active', 'true');
+    expect(screen.getByRole('link', { name: 'Register' })).toHaveAttribute('href', '/assets');
+    expect(screen.getByRole('link', { name: 'Register' })).not.toHaveAttribute('data-active', 'true');
+  });
+
   it('lists Appointments as its own entry', () => {
     renderWithProviders(<AppNav />, { route: '/appointments' });
 

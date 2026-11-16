@@ -14,6 +14,8 @@ describe('AssetsController', () => {
       assignments: jest.fn(),
       history: jest.fn(),
       serviceHistory: jest.fn(),
+      valuation: jest.fn(),
+      valuationReport: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       checkOut: jest.fn(),
@@ -69,5 +71,13 @@ describe('AssetsController', () => {
 
     expect(service.checkOut).toHaveBeenCalledWith('a1', { assigneeId: 'u1' }, { id: 'user-1' });
     expect(service.checkIn).toHaveBeenCalledWith('a1', { condition: 'GOOD' }, { id: 'user-1' });
+  });
+
+  it('valuation forwards the asset and the day, and the report forwards its filters', () => {
+    controller.valuation('a1', '2027-01-15');
+    controller.valuationReport('org-1', '2027-01-15', 'true');
+
+    expect(service.valuation).toHaveBeenCalledWith('a1', '2027-01-15');
+    expect(service.valuationReport).toHaveBeenCalledWith({ organizationId: 'org-1', asOf: '2027-01-15', includeDecommissioned: 'true' });
   });
 });

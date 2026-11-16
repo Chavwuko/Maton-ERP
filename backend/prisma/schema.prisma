@@ -239,28 +239,36 @@ enum MilestoneStatus {
 // vehicles, facilities — and can optionally be tied to the project it's
 // currently deployed on.
 model Asset {
-  id             String         @id @default(uuid())
-  organizationId String
-  projectId      String?
-  assetTag       String
-  name           String
-  category       String
-  status         AssetStatus    @default(ACTIVE)
-  location       String?
+  id                    String             @id @default(uuid())
+  organizationId        String
+  projectId             String?
+  assetTag              String
+  name                  String
+  category              String
+  status                AssetStatus        @default(ACTIVE)
+  location              String?
   // The full record: what it is, where it came from, and how good it is.
-  serialNumber   String?
-  make           String?
-  model          String?
-  purchaseDate   DateTime?      @db.Date
-  purchaseCost   Decimal?       @db.Decimal(18, 2)
-  vendorId       String?
-  warrantyExpiry DateTime?      @db.Date
-  condition      AssetCondition @default(GOOD)
-  notes          String?
+  serialNumber          String?
+  make                  String?
+  model                 String?
+  purchaseDate          DateTime?          @db.Date
+  purchaseCost          Decimal?           @db.Decimal(18, 2)
+  vendorId              String?
+  warrantyExpiry        DateTime?          @db.Date
+  condition             AssetCondition     @default(GOOD)
+  notes                 String?
   // The department that owns it, as opposed to whoever holds it right now.
-  departmentId   String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  departmentId          String?
+  // How it loses value on the books. Book value is worked out on demand from
+  // these (nothing is posted), so editing them re-values the asset at once.
+  depreciationMethod    DepreciationMethod @default(NONE)
+  usefulLifeMonths      Int?
+  // What it is expected to be worth at the end of its life; empty means zero.
+  salvageValue          Decimal?           @db.Decimal(18, 2)
+  // Depreciation starts here; empty means the purchase date.
+  depreciationStartDate DateTime?          @db.Date
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
   organization Organization          @relation(fields: [organizationId], references: [id])
   project      Project?              @relation(fields: [projectId], references: [id])
@@ -275,6 +283,14 @@ model Asset {
   // Postgres lets several rows have no serial number; real ones stay unique.
   @@unique([organizationId, serialNumber])
   @@map("assets")
+}
+
+enum DepreciationMethod {
+  NONE
+  STRAIGHT_LINE
+  // Double-declining balance, switching to straight line when that writes the
+  // rest off faster, so it ends exactly at the salvage value.
+  DECLINING_BALANCE
 }
 
 enum AssetCondition {

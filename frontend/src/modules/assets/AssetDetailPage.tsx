@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Anchor, Badge, Button, Group, Loader, Paper, Stack, Table, Text, Title } from '@mantine/core';
+import { Alert, Anchor, Badge, Button, Group, Loader, Paper, SimpleGrid, Stack, Table, Text, Title } from '@mantine/core';
 import { ApiError } from '../../api/client';
-import { getAsset, getAssetHistory, getAssetServiceHistory, listAssetAssignments } from '../../api/assets';
+import { getAsset, getAssetHistory, getAssetServiceHistory, getAssetValuation, listAssetAssignments } from '../../api/assets';
 import { listSchedules } from '../../api/maintenance';
+import { StatCard } from '../../components/StatCard';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useRole } from '../../auth/RoleContext';
 import { hasRole } from '../../auth/roleStore';
@@ -12,7 +13,7 @@ import { formatMoney, formatQty } from '../inventory/format';
 import { ScheduleDialog } from '../maintenance/ScheduleDialog';
 import { DUE_STATUS_COLORS, intervalLabel, WORK_ORDER_STATUS_COLORS } from '../maintenance/types';
 import { CheckInDialog, CheckOutDialog, EditAssetDialog } from './AssetDialogs';
-import { ASSET_CONDITION_COLORS, ASSET_STATUS_COLORS, assetDate, holderName } from './types';
+import { ASSET_CONDITION_COLORS, ASSET_STATUS_COLORS, DEPRECIATION_METHODS, assetDate, holderName } from './types';
 
 type Dialog = 'edit' | 'check-out' | 'check-in' | 'schedule' | null;
 
@@ -37,6 +38,13 @@ export function AssetDetailPage() {
     queryKey: ['assets', id, 'assignments'],
     queryFn: () => listAssetAssignments(id!),
     enabled: !!id,
+  });
+
+  // Book values are money, which the staff role never sees.
+  const { data: valuation } = useQuery({
+    queryKey: ['assets', id, 'valuation'],
+    queryFn: () => getAssetValuation(id!),
+    enabled: !!id && role !== 'staff',
   });
 
   const { data: schedules } = useQuery({
@@ -145,6 +153,52 @@ export function AssetDetailPage() {
           ))}
         </Table.Tbody>
       </Table>
+
+      {valuation && (
+        <>
+          <Title order={4}>Valuation</Title>
+          {valuation.cost === null ? (
+            <Text c="dimmed">No purchase cost is recorded, so this asset cannot be valued.</Text>
+          ) : (
+            <>
+              <SimpleGrid cols={{ base: 1, sm: 3 }}>
+                <StatCard label="Book value today" value={formatMoney(valuation.bookValue!)} />
+                <StatCard label="Accumulated depreciation" value={formatMoney(valuation.accumulatedDepreciation!)} />
+                <StatCard label="Original cost" value={formatMoney(valuation.cost)} />
+              </SimpleGrid>
+              <Text size="sm" c="dimmed">
+                {valuation.schedule.length === 0
+                  ? 'Not depreciated: carried at its purchase cost.'
+                  : `${DEPRECIATION_METHODS.find((method) => method.value === valuation.method)?.label}, ${valuation.monthsElapsed} of ${valuation.usefulLifeMonths} months${valuation.fullyDepreciated ? ' · fully depreciated' : ''}.`}
+              </Text>
+              {valuation.schedule.length > 0 && (
+                <Table striped>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Year</Table.Th>
+                      <Table.Th>Ends</Table.Th>
+                      <Table.Th ta="right">Opening</Table.Th>
+                      <Table.Th ta="right">Depreciation</Table.Th>
+                      <Table.Th ta="right">Closing</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {valuation.schedule.map((row) => (
+                      <Table.Tr key={row.year}>
+                        <Table.Td>{row.year}</Table.Td>
+                        <Table.Td>{assetDate(row.endsOn)}</Table.Td>
+                        <Table.Td ta="right">{formatMoney(row.opening)}</Table.Td>
+                        <Table.Td ta="right">{formatMoney(row.depreciation)}</Table.Td>
+                        <Table.Td ta="right">{formatMoney(row.closing)}</Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              )}
+            </>
+          )}
+        </>
+      )}
 
       <Title order={4}>Custody history</Title>
       <Table striped highlightOnHover>

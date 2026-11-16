@@ -16,4 +16,9 @@ export class CreateAssetDto {
   condition?: string;
   notes?: string;
   departmentId?: string;
+  // How it loses value on the books; the rest are needed unless this is NONE.
+  depreciationMethod?: string;
+  usefulLifeMonths?: number;
+  salvageValue?: number;
+  depreciationStartDate?: string;
 }

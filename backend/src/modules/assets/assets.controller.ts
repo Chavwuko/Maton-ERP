@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseInterceptors } from '@nestjs/common';
 import type { Request } from 'express';
 import { Roles } from '../../auth/roles.guard';
+import { ASSIGNABLE_ROLES } from '../users/user-roles';
 import { StaffCostRedactionInterceptor } from '../inventory/staff-cost-redaction.interceptor';
 import { AssetsService } from './assets.service';
 import { CheckInAssetDto } from './dto/check-in-asset.dto';
@@ -29,6 +30,18 @@ export class AssetsController {
     return this.assetsService.findAll({ organizationId, status, projectId, departmentId, condition, assignedToId, search });
   }
 
+  // Book values are money, which the `staff` role never sees. Declared before
+  // ':id' so "valuation" is not read as an id.
+  @Roles(...ASSIGNABLE_ROLES.filter((role) => role !== 'staff'))
+  @Get('valuation')
+  valuationReport(
+    @Query('organizationId') organizationId?: string,
+    @Query('asOf') asOf?: string,
+    @Query('includeDecommissioned') includeDecommissioned?: string,
+  ) {
+    return this.assetsService.valuationReport({ organizationId, asOf, includeDecommissioned });
+  }
+
   // Declared before ':id' so "mine" is not read as an id.
   @Get('mine')
   findMine(@Req() req: Request) {
@@ -43,6 +56,12 @@ export class AssetsController {
   @Get(':id/assignments')
   assignments(@Param('id') id: string) {
     return this.assetsService.assignments(id);
+  }
+
+  @Roles(...ASSIGNABLE_ROLES.filter((role) => role !== 'staff'))
+  @Get(':id/valuation')
+  valuation(@Param('id') id: string, @Query('asOf') asOf?: string) {
+    return this.assetsService.valuation(id, asOf);
   }
 
   @Get(':id/service-history')

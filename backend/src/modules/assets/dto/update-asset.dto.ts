@@ -18,4 +18,9 @@ export class UpdateAssetDto {
   condition?: string;
   notes?: string | null;
   departmentId?: string | null;
+  // How it loses value on the books; the rest are needed unless this is NONE.
+  depreciationMethod?: string;
+  usefulLifeMonths?: number | null;
+  salvageValue?: number | null;
+  depreciationStartDate?: string | null;
 }
