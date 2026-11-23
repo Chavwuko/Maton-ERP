@@ -147,7 +147,7 @@ export function applyScheduleChanges(
     throw new BadRequestException('Working hours are shorter than one slot');
   }
   if (!Number.isInteger(next.slotCapacity) || next.slotCapacity < 1 || next.slotCapacity > 50) {
-    throw new BadRequestException('Appointments per slot must be a whole number from 1 to 50');
+    throw new BadRequestException('Requests per slot must be a whole number from 1 to 50');
   }
   if (next.workingDays.length === 0 || next.workingDays.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) {
     throw new BadRequestException('Select at least one working day (0 = Sunday to 6 = Saturday)');

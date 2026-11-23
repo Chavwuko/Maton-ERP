@@ -122,14 +122,14 @@ describe('Email notifications (e2e)', () => {
       await waitFor(() => mailTo(storeAdmin).some((m) => m.subject.includes(`Gloves ${run}`)));
 
       const toStore = mailTo(storeAdmin).find((m) => m.subject.includes(`Gloves ${run}`))!;
-      expect(toStore.subject).toBe(`[ERP Foundations] New appointment request — Gloves ${run}`);
-      expect(toStore.text).toContain(`booked "Gloves ${run}" for ${day} at ${time(0)}`);
+      expect(toStore.subject).toBe(`[ERP Foundations] New request — Gloves ${run}`);
+      expect(toStore.text).toContain(`sent a request "Gloves ${run}" for ${day} at ${time(0)}`);
 
       await admin.post(`/appointments/${booked.body.id}/review`).send({ decision: 'APPROVED', feedback: 'Bring your site pass' });
       await waitFor(() => mailTo(pat).some((m) => m.subject.includes('was approved —')));
 
       const toRequester = mailTo(pat).find((m) => m.subject.includes('was approved —'))!;
-      expect(toRequester.subject).toBe(`[ERP Foundations] Your appointment was approved — Gloves ${run}`);
+      expect(toRequester.subject).toBe(`[ERP Foundations] Your request was approved — Gloves ${run}`);
       expect(toRequester.text).toContain('Bring your site pass');
     });
 
@@ -137,7 +137,7 @@ describe('Email notifications (e2e)', () => {
       const mine = await book(1, `Mine ${run}`);
       await asSignup(pat).post(`/appointments/${mine.body.id}/cancel`);
       await waitFor(() => mailTo(storeAdmin).some((m) => m.subject.includes(`cancelled — Mine ${run}`)));
-      expect(mailTo(storeAdmin).some((m) => m.subject === `[ERP Foundations] Appointment cancelled — Mine ${run}`)).toBe(true);
+      expect(mailTo(storeAdmin).some((m) => m.subject === `[ERP Foundations] Request cancelled — Mine ${run}`)).toBe(true);
 
       const theirs = await book(2, `Theirs ${run}`);
       await admin.post(`/appointments/${theirs.body.id}/cancel`);

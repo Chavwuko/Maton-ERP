@@ -34,7 +34,7 @@ describe('email templates', () => {
   });
 
   it('calls the feature by one configurable word', () => {
-    expect(TERM).toEqual({ singular: 'appointment', plural: 'appointments' });
+    expect(TERM).toEqual({ singular: 'request', plural: 'requests', feature: 'Make Request' });
   });
 
   describe('sign-up', () => {
@@ -67,14 +67,14 @@ describe('email templates', () => {
   describe('bookings', () => {
     it('tells the store about a new one', () => {
       expect(bookingCreated(booking())).toEqual({
-        subject: 'New appointment request — Gloves',
-        body: 'Ann Store booked "Gloves" for 2026-10-26 at 09:00. Open Appointments to review it.',
+        subject: 'New request — Gloves',
+        body: 'Ann Store sent a request "Gloves" for 2026-10-26 at 09:00. Open Make Request to review it.',
       });
     });
 
     it('tells the store when the requester cancels', () => {
       expect(bookingCancelledByRequester(booking())).toEqual({
-        subject: 'Appointment cancelled — Gloves',
+        subject: 'Request cancelled — Gloves',
         body: 'Ann Store cancelled "Gloves" (2026-10-26 at 09:00).',
       });
     });
@@ -84,22 +84,22 @@ describe('email templates', () => {
         booking({ status: 'COMPLETED', feedback: 'Handed over', feedbackBy: kay, issuedNote: 'Issued: 10 pcs Gloves' }),
       );
 
-      expect(email.subject).toBe('Your appointment was completed — Gloves');
+      expect(email.subject).toBe('Your request was completed — Gloves');
       expect(email.body).toBe(
-        'Hello Ann Store,\n\nYour appointment "Gloves" on 2026-10-26 at 09:00 is now: Completed.\n\nFeedback from Kay Keeper:\nHanded over\n\nIssued: 10 pcs Gloves',
+        'Hello Ann Store,\n\nYour request "Gloves" on 2026-10-26 at 09:00 is now: Completed.\n\nFeedback from Kay Keeper:\nHanded over\n\nIssued: 10 pcs Gloves',
       );
     });
 
     it('leaves out feedback and notes that are not there, and the name when nobody is recorded', () => {
-      expect(bookingDecided(booking()).body).toBe('Hello Ann Store,\n\nYour appointment "Gloves" on 2026-10-26 at 09:00 is now: Approved.');
+      expect(bookingDecided(booking()).body).toBe('Hello Ann Store,\n\nYour request "Gloves" on 2026-10-26 at 09:00 is now: Approved.');
       expect(bookingDecided(booking({ status: 'DECLINED', feedback: 'Out of stock' })).body).toContain('Feedback:\nOut of stock');
     });
 
     it('says so plainly when the store cancels', () => {
       const email = bookingDecided(booking({ status: 'CANCELLED', feedback: 'Cancelled by the store.' }));
 
-      expect(email.subject).toBe('Your appointment was cancelled — Gloves');
-      expect(email.body).toContain('Your appointment was cancelled by the store.');
+      expect(email.subject).toBe('Your request was cancelled — Gloves');
+      expect(email.body).toContain('Your request was cancelled by the store.');
     });
   });
 
@@ -121,7 +121,7 @@ describe('email templates', () => {
 
       expect(email.subject).toBe('Reminder: 2 items waiting for you');
       expect(email.body).toBe(
-        'These have been waiting for more than 24 hours:\n\nSign-up requests:\n • Pat Pending (pat@acme.com)\n\nAppointments awaiting review:\n • Gloves — Ann Store, 2026-10-26 09:00',
+        'These have been waiting for more than 24 hours:\n\nSign-up requests:\n • Pat Pending (pat@acme.com)\n\nRequests awaiting review:\n • Gloves — Ann Store, 2026-10-26 09:00',
       );
     });
 
@@ -129,7 +129,7 @@ describe('email templates', () => {
       const email = waitingReminder([{ name: 'Pat', email: 'pat@acme.com' }], []);
 
       expect(email.subject).toBe('Reminder: 1 item waiting for you');
-      expect(email.body).not.toContain('Appointments awaiting review');
+      expect(email.body).not.toContain('Requests awaiting review');
 
       expect(waitingReminder([], [{ subject: 'A', requester: 'B', date: new Date('2026-10-26'), time: '09:00' }]).body).not.toContain('Sign-up requests');
     });

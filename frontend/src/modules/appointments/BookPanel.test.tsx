@@ -73,7 +73,7 @@ describe('BookPanel', () => {
     renderWithProviders(<BookPanel />);
 
     await pickDate(user);
-    expect(await screen.findByText(/does not take appointments on this day/)).toBeInTheDocument();
+    expect(await screen.findByText(/does not take requests on this day/)).toBeInTheDocument();
 
     vi.mocked(appointmentsApi.getSlots).mockRejectedValue(new ApiError(400, 'date must look like 2026-10-24'));
     await user.clear(screen.getByLabelText('Date', { exact: false }));
@@ -95,13 +95,13 @@ describe('BookPanel', () => {
     const user = userEvent.setup();
     renderWithProviders(<BookPanel />);
 
-    await user.click(screen.getByRole('button', { name: 'Book appointment' }));
+    await user.click(screen.getByRole('button', { name: 'Send request' }));
     expect(await screen.findByText('Choose a date')).toBeInTheDocument();
-    expect(screen.getByText('Please give your appointment a subject')).toBeInTheDocument();
+    expect(screen.getByText('Please give your request a subject')).toBeInTheDocument();
 
     await pickDate(user);
     await user.type(screen.getByLabelText('Subject', { exact: false }), 'Gloves');
-    await user.click(screen.getByRole('button', { name: 'Book appointment' }));
+    await user.click(screen.getByRole('button', { name: 'Send request' }));
     expect(await screen.findByText('Choose a time slot')).toBeInTheDocument();
     expect(appointmentsApi.bookAppointment).not.toHaveBeenCalled();
 
@@ -123,7 +123,7 @@ describe('BookPanel', () => {
     await pickOption(user, screen.getByPlaceholderText('Select item'), 'GLV-1 — Work gloves');
     await user.clear(screen.getByLabelText('Quantity 1'));
     await user.type(screen.getByLabelText('Quantity 1'), '10');
-    await user.click(screen.getByRole('button', { name: 'Book appointment' }));
+    await user.click(screen.getByRole('button', { name: 'Send request' }));
 
     await waitFor(() => {
       expect(vi.mocked(appointmentsApi.bookAppointment).mock.calls[0][0]).toEqual({
@@ -135,7 +135,7 @@ describe('BookPanel', () => {
         items: [{ itemId: 'item-1', quantity: 10 }],
       });
     });
-    expect(await screen.findByText('Appointment booked. The store will review it.')).toBeInTheDocument();
+    expect(await screen.findByText('Request sent. The store will review it.')).toBeInTheDocument();
     expect(screen.getByLabelText('Subject', { exact: false })).toHaveValue('');
   });
 
@@ -147,7 +147,7 @@ describe('BookPanel', () => {
     await pickDate(user);
     await user.click(await screen.findByRole('button', { name: '09:00' }));
     await user.type(screen.getByLabelText('Subject', { exact: false }), 'Just a chat');
-    await user.click(screen.getByRole('button', { name: 'Book appointment' }));
+    await user.click(screen.getByRole('button', { name: 'Send request' }));
 
     await waitFor(() => {
       expect(vi.mocked(appointmentsApi.bookAppointment).mock.calls[0][0]).toMatchObject({
@@ -167,7 +167,7 @@ describe('BookPanel', () => {
     await user.type(screen.getByLabelText('Subject', { exact: false }), 'Gloves');
     await user.click(screen.getByRole('button', { name: 'Add an item' }));
     await user.clear(screen.getByLabelText('Quantity 1'));
-    await user.click(screen.getByRole('button', { name: 'Book appointment' }));
+    await user.click(screen.getByRole('button', { name: 'Send request' }));
 
     expect(await screen.findByText('Choose an item')).toBeInTheDocument();
     expect(screen.getByText('Enter a quantity')).toBeInTheDocument();
@@ -185,15 +185,15 @@ describe('BookPanel', () => {
     await pickDate(user);
     await user.click(await screen.findByRole('button', { name: '09:00' }));
     await user.type(screen.getByLabelText('Subject', { exact: false }), 'Gloves');
-    await user.click(screen.getByRole('button', { name: 'Book appointment' }));
+    await user.click(screen.getByRole('button', { name: 'Send request' }));
 
     expect(await screen.findByText('That time slot is full. Please pick another')).toBeInTheDocument();
     await waitFor(() => expect(appointmentsApi.getSlots).toHaveBeenCalledTimes(2));
 
     vi.mocked(appointmentsApi.bookAppointment).mockRejectedValueOnce(new Error('network'));
     await user.click(await screen.findByRole('button', { name: '09:00' }));
-    await user.click(screen.getByRole('button', { name: 'Book appointment' }));
-    expect(await screen.findByText('Failed to book appointment')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Send request' }));
+    expect(await screen.findByText('Failed to send request')).toBeInTheDocument();
   });
 
   it('forgets the chosen slot when the date changes', async () => {
@@ -208,7 +208,7 @@ describe('BookPanel', () => {
     await user.clear(screen.getByLabelText('Date', { exact: false }));
     await user.type(screen.getByLabelText('Date', { exact: false }), '2026-10-27');
     await user.type(screen.getByLabelText('Subject', { exact: false }), 'Gloves');
-    await user.click(screen.getByRole('button', { name: 'Book appointment' }));
+    await user.click(screen.getByRole('button', { name: 'Send request' }));
 
     expect(await screen.findByText('Choose a time slot')).toBeInTheDocument();
   });

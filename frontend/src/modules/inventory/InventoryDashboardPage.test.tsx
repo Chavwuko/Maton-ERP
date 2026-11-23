@@ -81,8 +81,8 @@ describe('InventoryDashboardPage', () => {
     it('shows what needs attention, as links, and the headline numbers', async () => {
       renderWithProviders(<InventoryDashboardPage />);
 
-      expect(await screen.findByText('Appointments awaiting review')).toBeInTheDocument();
-      expect(screen.getByText('Appointments awaiting review').closest('a')).toHaveAttribute('href', '/appointments?tab=all');
+      expect(await screen.findByText('Requests awaiting review')).toBeInTheDocument();
+      expect(screen.getByText('Requests awaiting review').closest('a')).toHaveAttribute('href', '/appointments?tab=all');
       expect(screen.getByText('Sign-up requests waiting').closest('a')).toHaveAttribute('href', '/users?tab=requests');
       expect(screen.getByText('4,567.50')).toBeInTheDocument();
       expect(screen.getByText('1,200.00')).toBeInTheDocument();
@@ -94,7 +94,7 @@ describe('InventoryDashboardPage', () => {
       setCurrentRole('inventory');
       renderWithProviders(<InventoryDashboardPage />);
 
-      await screen.findByText('Appointments awaiting review');
+      await screen.findByText('Requests awaiting review');
       expect(screen.queryByText('Sign-up requests waiting')).not.toBeInTheDocument();
     });
 
@@ -132,7 +132,7 @@ describe('InventoryDashboardPage', () => {
       renderWithProviders(<InventoryDashboardPage />);
 
       expect(await screen.findByText('Nothing is low or out of stock.')).toBeInTheDocument();
-      expect(screen.getByText('No upcoming appointments.')).toBeInTheDocument();
+      expect(screen.getByText('No upcoming requests.')).toBeInTheDocument();
       expect(screen.getByText('No stock movements yet.')).toBeInTheDocument();
     });
   });
@@ -147,7 +147,7 @@ describe('InventoryDashboardPage', () => {
       renderWithProviders(<InventoryDashboardPage />);
 
       expect(await screen.findByText('Hello, Ann Store.')).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'Book an appointment' })).toHaveAttribute('href', '/appointments');
+      expect(screen.getByRole('link', { name: 'Make a request' })).toHaveAttribute('href', '/appointments');
       expect(screen.getByText('My booking')).toBeInTheDocument();
       expect(screen.getByText('Handed over')).toBeInTheDocument();
       expect(screen.getByText('— Kay Keeper')).toBeInTheDocument();

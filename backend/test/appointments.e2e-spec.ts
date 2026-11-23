@@ -147,7 +147,7 @@ describe('Appointments (e2e)', () => {
       const res = await book(staff);
 
       expect(res.status).toBe(400);
-      expect(res.body.message).toBe('You already have an appointment at that time');
+      expect(res.body.message).toBe('You already have a request at that time');
     });
 
     it.each([
@@ -213,7 +213,7 @@ describe('Appointments (e2e)', () => {
       expect((await review({ decision: 'COMPLETED', feedback: 'Done', warehouseId: whId, issue })).body.message).toMatch(
         /no department/,
       );
-      expect((await review({ decision: 'APPROVED' })).body.message).toBe('This appointment is already approved');
+      expect((await review({ decision: 'APPROVED' })).body.message).toBe('This request is already approved');
     });
 
     it('does nothing at all when the stock is short', async () => {
@@ -280,7 +280,7 @@ describe('Appointments (e2e)', () => {
       expect((await stranger.post(`/appointments/${id}/cancel`)).status).toBe(403);
       const res = await staff.post(`/appointments/${id}/cancel`);
       expect(res.body.status).toBe('CANCELLED');
-      expect((await staff.post(`/appointments/${id}/cancel`)).body.message).toBe('This appointment is already cancelled');
+      expect((await staff.post(`/appointments/${id}/cancel`)).body.message).toBe('This request is already cancelled');
 
       // The freed slot can be booked again.
       expect((await book(staff, { time: slot(3), subject: `Again ${run}` })).status).toBe(201);

@@ -56,11 +56,11 @@ describe('AppNav', () => {
     expect(screen.getByRole('link', { name: 'Register' })).not.toHaveAttribute('data-active', 'true');
   });
 
-  it('lists Appointments as its own entry', () => {
+  it('lists Make Request as its own entry', () => {
     renderWithProviders(<AppNav />, { route: '/appointments' });
 
-    expect(screen.getByRole('link', { name: 'Appointments' })).toHaveAttribute('href', '/appointments');
-    expect(screen.getByRole('link', { name: 'Appointments' })).toHaveAttribute('data-active', 'true');
+    expect(screen.getByRole('link', { name: 'Make Request' })).toHaveAttribute('href', '/appointments');
+    expect(screen.getByRole('link', { name: 'Make Request' })).toHaveAttribute('data-active', 'true');
   });
 
   it('expands Maintenance into Work orders and Schedules, lighting up only the one you are on', () => {

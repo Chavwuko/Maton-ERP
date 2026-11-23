@@ -21,17 +21,17 @@ export function MyAppointmentsPanel() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       queryClient.invalidateQueries({ queryKey: ['appointment-slots'] });
-      notifications.show({ message: 'Appointment cancelled', color: 'green' });
+      notifications.show({ message: 'Request cancelled', color: 'green' });
     },
     onError: (err) =>
-      notifications.show({ message: err instanceof ApiError ? err.message : 'Failed to cancel appointment', color: 'red' }),
+      notifications.show({ message: err instanceof ApiError ? err.message : 'Failed to cancel request', color: 'red' }),
   });
 
   return (
     <>
       {isLoading && <Loader />}
       {isError && (
-        <Alert color="red" title="Couldn't load your appointments">
+        <Alert color="red" title="Couldn't load your requests">
           {error instanceof ApiError ? error.message : 'Unknown error'}
         </Alert>
       )}
@@ -78,7 +78,7 @@ export function MyAppointmentsPanel() {
                       variant="subtle"
                       color="red"
                       onClick={() => {
-                        if (window.confirm('Cancel this appointment?')) cancelMutation.mutate(appointment.id);
+                        if (window.confirm('Cancel this request?')) cancelMutation.mutate(appointment.id);
                       }}
                     >
                       Cancel
@@ -89,7 +89,7 @@ export function MyAppointmentsPanel() {
             ))}
             {appointments.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={6}>You have no appointments yet.</Table.Td>
+                <Table.Td colSpan={6}>You have no requests yet.</Table.Td>
               </Table.Tr>
             )}
           </Table.Tbody>

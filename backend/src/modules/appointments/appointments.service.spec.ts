@@ -204,7 +204,7 @@ describe('AppointmentsService', () => {
     });
 
     it('needs a subject', async () => {
-      await expect(service.book({ ...request, subject: '  ' }, user())).rejects.toThrow('Please give your appointment a subject');
+      await expect(service.book({ ...request, subject: '  ' }, user())).rejects.toThrow('Please give your request a subject');
       await expect(service.book({ ...request, subject: undefined as never }, user())).rejects.toThrow(BadRequestException);
     });
 
@@ -233,7 +233,7 @@ describe('AppointmentsService', () => {
 
     it('refuses a non-working day', async () => {
       await expect(service.book({ ...request, date: SATURDAY }, user())).rejects.toThrow(
-        'Appointments are only available on working days',
+        'Requests are only available on working days',
       );
     });
 
@@ -248,7 +248,7 @@ describe('AppointmentsService', () => {
       prisma.appSetting.findMany.mockResolvedValue([{ key: 'appointments.slotCapacity', value: '3' }] as never);
       prisma.appointment.findMany.mockResolvedValue([{ requesterId: 'req-1' }] as never);
 
-      await expect(service.book(request, user())).rejects.toThrow('You already have an appointment at that time');
+      await expect(service.book(request, user())).rejects.toThrow('You already have a request at that time');
     });
   });
 

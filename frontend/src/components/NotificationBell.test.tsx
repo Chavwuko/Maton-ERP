@@ -82,7 +82,7 @@ describe('NotificationBell', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Notifications, 1 waiting' }, { timeout: 5000 }));
 
-    expect(await screen.findByText('Appointments to review', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText('Requests to review', {}, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.queryByText('Sign-up requests')).not.toBeInTheDocument();
   });
 

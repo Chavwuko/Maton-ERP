@@ -149,21 +149,21 @@ export function AllAppointmentsPanel() {
         queryClient.invalidateQueries({ queryKey: ['consumptions'] });
         queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
       }
-      notifications.show({ message: `Appointment ${DECISION_DONE[values.decision]}`, color: 'green' });
+      notifications.show({ message: `Request ${DECISION_DONE[values.decision]}`, color: 'green' });
       setReviewing(null);
     },
     onError: (err) =>
-      notifications.show({ message: err instanceof ApiError ? err.message : 'Failed to review appointment', color: 'red' }),
+      notifications.show({ message: err instanceof ApiError ? err.message : 'Failed to review request', color: 'red' }),
   });
 
   const cancelMutation = useMutation({
     mutationFn: (id: string) => cancelAppointment(id),
     onSuccess: () => {
       refresh();
-      notifications.show({ message: 'Appointment cancelled', color: 'green' });
+      notifications.show({ message: 'Request cancelled', color: 'green' });
     },
     onError: (err) =>
-      notifications.show({ message: err instanceof ApiError ? err.message : 'Failed to cancel appointment', color: 'red' }),
+      notifications.show({ message: err instanceof ApiError ? err.message : 'Failed to cancel request', color: 'red' }),
   });
 
   const decisions: Decision[] = reviewing?.status === 'APPROVED' ? ['DECLINED', 'COMPLETED'] : ['APPROVED', 'DECLINED', 'COMPLETED'];
@@ -188,7 +188,7 @@ export function AllAppointmentsPanel() {
 
       {isLoading && <Loader />}
       {isError && (
-        <Alert color="red" title="Couldn't load appointments">
+        <Alert color="red" title="Couldn't load requests">
           {error instanceof ApiError ? error.message : 'Unknown error'}
         </Alert>
       )}
@@ -248,7 +248,7 @@ export function AllAppointmentsPanel() {
                           variant="subtle"
                           color="red"
                           onClick={() => {
-                            if (window.confirm('Cancel this appointment?')) cancelMutation.mutate(appointment.id);
+                            if (window.confirm('Cancel this request?')) cancelMutation.mutate(appointment.id);
                           }}
                         >
                           Cancel
@@ -261,7 +261,7 @@ export function AllAppointmentsPanel() {
             })}
             {appointments.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={7}>No appointments match.</Table.Td>
+                <Table.Td colSpan={7}>No requests match.</Table.Td>
               </Table.Tr>
             )}
           </Table.Tbody>

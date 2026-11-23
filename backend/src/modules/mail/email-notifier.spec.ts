@@ -66,10 +66,10 @@ describe('EmailNotifier', () => {
     expect(mail.send).toHaveBeenNthCalledWith(
       1,
       ['boss@acme.com', 'kay@acme.com'],
-      'New appointment request — Gloves',
+      'New request — Gloves',
       expect.stringContaining('Open to review: /appointments?tab=all'),
     );
-    expect(mail.send).toHaveBeenNthCalledWith(2, ['boss@acme.com', 'kay@acme.com'], 'Appointment cancelled — Gloves', expect.any(String));
+    expect(mail.send).toHaveBeenNthCalledWith(2, ['boss@acme.com', 'kay@acme.com'], 'Request cancelled — Gloves', expect.any(String));
   });
 
   it('tells the requester about a decision', async () => {
@@ -77,8 +77,8 @@ describe('EmailNotifier', () => {
 
     expect(mail.send).toHaveBeenCalledWith(
       ['ann@acme.com'],
-      'Your appointment was approved — Gloves',
-      expect.stringContaining('Open your bookings: /appointments?tab=mine'),
+      'Your request was approved — Gloves',
+      expect.stringContaining('Open your requests: /appointments?tab=mine'),
     );
   });
 

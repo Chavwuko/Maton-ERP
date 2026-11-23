@@ -446,7 +446,13 @@ ledger, kept in sync by `InventoryService`'s private `applyStockDelta` —
 never write it directly from a new endpoint; go through
 `recordTransaction`/`transfer` (or extend them) so the two can't drift.
 
-## Appointments module
+## Make Request module (code name: appointments)
+
+This feature is called **Make Request** wherever people see it (the nav entry,
+page, tabs, messages and emails). Its code, API routes (`/appointments`),
+database tables (`appointments`, `appointment_items`) and activity-log codes
+(`APPOINTMENT_*`) keep the original name, so existing links and history still
+work; the text below uses the code names.
 
 Anyone signed in can book a slot with the store and list the items they need;
 admin/inventory (the people who run the store) approve, decline or complete
@@ -485,8 +491,8 @@ appointment is `PENDING` or `APPROVED`.
   the appointment's subject. Two people completing the same appointment at
   once cannot issue the stock twice (409 for the second).
 
-**Frontend**: `/appointments` has **Book** (date, slot buttons, items),
-**My appointments** (with cancel), **All appointments** (admin/inventory:
+**Frontend**: `/appointments` (shown as **Make Request**) has **New request** (date, slot buttons, items),
+**My requests** (with cancel), **All requests** (admin/inventory:
 filters and a Review dialog that prefills the requested items with the
 on-hand quantity beside each) and **Schedule** (admin).
 
@@ -527,7 +533,7 @@ logged, and a failure to write the log never fails the request. It is shown
 on **Users -> Activity log**.
 
 **Notifications** — `GET /notifications` (admin, inventory) feeds the bell in
-the header: sign-up requests waiting (admin only) and appointments waiting for
+the header: sign-up requests waiting (admin only) and requests waiting for
 review, each linking to the right tab (`/users?tab=requests`,
 `/appointments?tab=all`; pages keep their selected tab in the URL). The bell
 refreshes every minute. Emails are covered in the Email section.
@@ -541,8 +547,8 @@ old store system's notifications). All plain text, one message per recipient.
 |---|---|
 | A new sign-up request arrives (first submission only, not edits) | Active admins |
 | A request is approved (with the role) or rejected (with the reason) | The person |
-| An appointment is booked, or its requester cancels it | Active admin and inventory users |
-| An appointment is approved, declined, completed or cancelled by the store | The requester, with the feedback and any "Issued: ..." note |
+| A request is made, or its requester cancels it | Active admin and inventory users |
+| A request is approved, declined, completed or cancelled by the store | The requester, with the feedback and any "Issued: ..." note |
 | Every day around 08:00 (in the appointment schedule's time zone) | Active admins: anything waiting more than 24 hours |
 
 Emails never get in the way of the action that triggers them: they are sent
@@ -571,8 +577,8 @@ http://localhost:8025. Real-looking addresses are needed to see mail there
 screen warns when no mail server is connected (`transport: "log"`).
 
 The wording lives in `modules/mail/templates.ts`; the feature's name in the
-emails comes from one constant (`TERM`) so the planned rename of "Appointment"
-(see the Roadmap) changes the emails in one place.
+emails comes from one constant (`TERM`: "request", "requests", and the feature
+name "Make Request"), so a future rename changes the emails in one place.
 
 ## Accounting module
 
@@ -1257,13 +1263,12 @@ Standing list of planned work — not yet started unless noted otherwise.
 - **HR dashboard visual redesign** to match a specific sketched layout the
   user will provide (current `HRDashboardPage` layout — stat card row +
   chart grid — is a first pass, not the intended final design).
-- **Rename "Appointment"** (to-do): the user wants a different word than
-  "Appointment" for this feature (the booking of a slot with the store). The
-  replacement word has not been chosen yet. Once it is, rename it everywhere
-  people see it: the nav entry and `/appointments` page and tabs, the
-  dashboard cards, notification bell, activity-log entries, emails, and this
-  README. Decide separately whether the API routes, database tables
-  (`appointments`, `appointment_items`) and code names should follow, since
-  renaming those needs a migration and touches every file under
-  `modules/appointments`.
+- ~~Rename "Appointment"~~ — done 2026-11-23: it is now **Make Request**
+  everywhere people read it (nav, page, tabs, dashboard cards, notification bell,
+  messages, emails). Still named `appointment` underneath: the `/appointments`
+  routes and URLs, the `appointments` / `appointment_items` tables, the
+  `modules/appointments` code, and the stored activity-log codes and entity type
+  (`APPOINTMENT_*`, `Appointment`), which the activity log still shows as-is.
+  Renaming those too would need a migration and would break old links, so it is
+  left until someone wants it.
 

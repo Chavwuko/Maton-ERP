@@ -18,13 +18,13 @@ export function AppointmentsPage() {
 
   return (
     <Stack>
-      <Title order={2}>Appointments</Title>
+      <Title order={2}>Make Request</Title>
 
       <Tabs value={tab} onChange={setTab}>
         <Tabs.List>
-          <Tabs.Tab value="book">Book</Tabs.Tab>
-          <Tabs.Tab value="mine">My appointments</Tabs.Tab>
-          {isStore && <Tabs.Tab value="all">All appointments</Tabs.Tab>}
+          <Tabs.Tab value="book">New request</Tabs.Tab>
+          <Tabs.Tab value="mine">My requests</Tabs.Tab>
+          {isStore && <Tabs.Tab value="all">All requests</Tabs.Tab>}
           {isAdmin && <Tabs.Tab value="schedule">Schedule</Tabs.Tab>}
         </Tabs.List>
 

@@ -50,7 +50,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Reports', path: '/inventory/reports' },
     ],
   },
-  { label: 'Appointments', path: '/appointments' },
+  { label: 'Make Request', path: '/appointments' },
   { label: 'Accounting', path: '/accounting' },
   { label: 'HSE', path: '/hse' },
   {

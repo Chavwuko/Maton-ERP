@@ -62,7 +62,7 @@ describe('MyAppointmentsPanel', () => {
   it('shows an empty state and an error state', async () => {
     vi.mocked(appointmentsApi.listMyAppointments).mockResolvedValueOnce([]);
     const { unmount } = renderWithProviders(<MyAppointmentsPanel />);
-    expect(await screen.findByText('You have no appointments yet.')).toBeInTheDocument();
+    expect(await screen.findByText('You have no requests yet.')).toBeInTheDocument();
     unmount();
 
     vi.mocked(appointmentsApi.listMyAppointments).mockRejectedValue(new ApiError(500, 'Server down'));
@@ -80,7 +80,7 @@ describe('MyAppointmentsPanel', () => {
     await user.click(await screen.findByRole('button', { name: 'Cancel' }));
 
     await waitFor(() => expect(vi.mocked(appointmentsApi.cancelAppointment).mock.calls[0][0]).toBe('appt-1'));
-    expect(await screen.findByText('Appointment cancelled')).toBeInTheDocument();
+    expect(await screen.findByText('Request cancelled')).toBeInTheDocument();
   });
 
   it('keeps the appointment when the confirmation is declined', async () => {
@@ -99,14 +99,14 @@ describe('MyAppointmentsPanel', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.mocked(appointmentsApi.listMyAppointments).mockResolvedValue([makeAppointment()]);
     vi.mocked(appointmentsApi.cancelAppointment)
-      .mockRejectedValueOnce(new ApiError(400, 'This appointment is already completed'))
+      .mockRejectedValueOnce(new ApiError(400, 'This request is already completed'))
       .mockRejectedValueOnce(new Error('network'));
 
     renderWithProviders(<MyAppointmentsPanel />);
     await user.click(await screen.findByRole('button', { name: 'Cancel' }));
-    expect(await screen.findByText('This appointment is already completed')).toBeInTheDocument();
+    expect(await screen.findByText('This request is already completed')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(await screen.findByText('Failed to cancel appointment')).toBeInTheDocument();
+    expect(await screen.findByText('Failed to cancel request')).toBeInTheDocument();
   });
 });

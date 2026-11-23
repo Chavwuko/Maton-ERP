@@ -100,7 +100,7 @@ export function ReportsPage() {
         <StatCard label="Issued to departments and projects" value={formatMoney(data.totals.consumption)} />
         <StatCard label="Purchase lines / issue lines" value={`${data.totals.purchaseLines} / ${data.totals.issueLines}`} />
         <StatCard
-          label="Appointments (completed / pending)"
+          label="Requests (completed / pending)"
           value={`${data.totals.appointments} (${data.totals.appointmentsCompleted} / ${data.totals.appointmentsPending})`}
         />
       </SimpleGrid>

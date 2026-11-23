@@ -33,9 +33,9 @@ describe('AppointmentsPage', () => {
     setCurrentRole(role);
     renderWithProviders(<AppointmentsPage />);
 
-    expect(screen.getByRole('tab', { name: 'Book' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'My appointments' })).toBeInTheDocument();
-    expect(screen.queryByRole('tab', { name: 'All appointments' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'New request' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'My requests' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'All requests' })).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Schedule' })).not.toBeInTheDocument();
   });
 
@@ -43,7 +43,7 @@ describe('AppointmentsPage', () => {
     setCurrentRole('inventory');
     renderWithProviders(<AppointmentsPage />);
 
-    expect(screen.getByRole('tab', { name: 'All appointments' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'All requests' })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Schedule' })).not.toBeInTheDocument();
   });
 
@@ -51,7 +51,7 @@ describe('AppointmentsPage', () => {
     setCurrentRole('admin');
     renderWithProviders(<AppointmentsPage />);
 
-    expect(screen.getByRole('tab', { name: 'All appointments' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'All requests' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Schedule' })).toBeInTheDocument();
   });
 });
@@ -67,18 +67,18 @@ describe('appointment helpers', () => {
   });
 
   describe('tabs follow the URL', () => {
-    it('opens All appointments for the notification bell link', async () => {
+    it('opens All requests for the notification bell link', async () => {
       setCurrentRole('inventory');
       renderWithProviders(<AppointmentsPage />, { route: '/appointments?tab=all' });
 
-      expect(await screen.findByRole('tab', { name: 'All appointments' })).toHaveAttribute('aria-selected', 'true');
+      expect(await screen.findByRole('tab', { name: 'All requests' })).toHaveAttribute('aria-selected', 'true');
     });
 
     it('falls back to Book when this role cannot see the tab', () => {
       setCurrentRole('staff');
       renderWithProviders(<AppointmentsPage />, { route: '/appointments?tab=all' });
 
-      expect(screen.getByRole('tab', { name: 'Book' })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByRole('tab', { name: 'New request' })).toHaveAttribute('aria-selected', 'true');
     });
 
     it('switches tabs when clicked', async () => {
@@ -86,9 +86,9 @@ describe('appointment helpers', () => {
       setCurrentRole('admin');
       renderWithProviders(<AppointmentsPage />);
 
-      await user.click(screen.getByRole('tab', { name: 'My appointments' }));
+      await user.click(screen.getByRole('tab', { name: 'My requests' }));
 
-      expect(screen.getByRole('tab', { name: 'My appointments' })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByRole('tab', { name: 'My requests' })).toHaveAttribute('aria-selected', 'true');
     });
   });
 });

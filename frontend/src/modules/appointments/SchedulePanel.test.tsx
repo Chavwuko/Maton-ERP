@@ -29,8 +29,8 @@ describe('SchedulePanel', () => {
 
     expect(await screen.findByLabelText('Opens')).toHaveValue('08:00');
     expect(screen.getByLabelText('Closes')).toHaveValue('17:00');
-    expect(screen.getByLabelText('Appointment length (minutes)')).toHaveValue('30');
-    expect(screen.getByLabelText('Appointments per slot')).toHaveValue('2');
+    expect(screen.getByLabelText('Slot length (minutes)')).toHaveValue('30');
+    expect(screen.getByLabelText('Requests per slot')).toHaveValue('2');
     expect(screen.getByLabelText('Time zone')).toHaveValue('Africa/Lagos');
     expect(screen.getByRole('checkbox', { name: 'Mon' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Sat' })).not.toBeChecked();
@@ -44,7 +44,7 @@ describe('SchedulePanel', () => {
     renderWithProviders(<SchedulePanel />);
     await user.click(await screen.findByRole('checkbox', { name: 'Sat' }));
     await user.click(screen.getByRole('checkbox', { name: 'Fri' }));
-    const capacity = screen.getByLabelText('Appointments per slot');
+    const capacity = screen.getByLabelText('Requests per slot');
     await user.clear(capacity);
     await user.type(capacity, '4');
     await user.click(screen.getByRole('button', { name: 'Save schedule' }));

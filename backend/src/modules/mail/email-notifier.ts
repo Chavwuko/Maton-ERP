@@ -59,7 +59,7 @@ export class EmailNotifier {
   bookingDecided(booking: Booking) {
     return this.safely('bookingDecided', async () => {
       const email = templates.bookingDecided(booking);
-      await this.mail.send([booking.requester.email], email.subject, email.body + this.mail.link('/appointments?tab=mine', 'Open your bookings'));
+      await this.mail.send([booking.requester.email], email.subject, email.body + this.mail.link('/appointments?tab=mine', 'Open your requests'));
     });
   }
 

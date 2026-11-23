@@ -80,7 +80,7 @@ describe('AllAppointmentsPanel', () => {
   it('shows empty and error states', async () => {
     vi.mocked(appointmentsApi.listAppointments).mockResolvedValueOnce([]);
     const { unmount } = renderWithProviders(<AllAppointmentsPanel />);
-    expect(await screen.findByText('No appointments match.')).toBeInTheDocument();
+    expect(await screen.findByText('No requests match.')).toBeInTheDocument();
     unmount();
 
     vi.mocked(appointmentsApi.listAppointments).mockRejectedValue(new ApiError(403, 'Forbidden resource'));
@@ -122,7 +122,7 @@ describe('AllAppointmentsPanel', () => {
         { decision: 'APPROVED', feedback: undefined },
       ]);
     });
-    expect(await screen.findByText('Appointment approved')).toBeInTheDocument();
+    expect(await screen.findByText('Request approved')).toBeInTheDocument();
   });
 
   it('requires feedback to decline, then sends it', async () => {
@@ -148,7 +148,7 @@ describe('AllAppointmentsPanel', () => {
         feedback: 'Please come back Monday',
       });
     });
-    expect(await screen.findByText('Appointment declined')).toBeInTheDocument();
+    expect(await screen.findByText('Request declined')).toBeInTheDocument();
   });
 
   it('offers only decline and complete for an approved appointment', async () => {
@@ -198,7 +198,7 @@ describe('AllAppointmentsPanel', () => {
         },
       ]);
     });
-    expect(await screen.findByText('Appointment completed')).toBeInTheDocument();
+    expect(await screen.findByText('Request completed')).toBeInTheDocument();
   });
 
   it('needs a warehouse, and a project when the requester has no department', async () => {
@@ -264,7 +264,7 @@ describe('AllAppointmentsPanel', () => {
     expect(await screen.findByText('Insufficient stock: GLV-1 at MAIN has 2 on hand')).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole('button', { name: 'Save decision' }));
-    expect(await screen.findByText('Failed to review appointment')).toBeInTheDocument();
+    expect(await screen.findByText('Failed to review request')).toBeInTheDocument();
   });
 
   it('cancels with confirmation, handling decline and failure', async () => {
@@ -272,7 +272,7 @@ describe('AllAppointmentsPanel', () => {
     const confirm = vi.spyOn(window, 'confirm');
     vi.mocked(appointmentsApi.cancelAppointment)
       .mockResolvedValueOnce(pending)
-      .mockRejectedValueOnce(new ApiError(400, 'This appointment is already cancelled'))
+      .mockRejectedValueOnce(new ApiError(400, 'This request is already cancelled'))
       .mockRejectedValueOnce(new Error('network'));
     renderWithProviders(<AllAppointmentsPanel />);
     await screen.findByText('Gloves for new hires');
@@ -285,11 +285,11 @@ describe('AllAppointmentsPanel', () => {
     confirm.mockReturnValue(true);
     await user.click(cancel());
     await waitFor(() => expect(vi.mocked(appointmentsApi.cancelAppointment).mock.calls[0][0]).toBe('appt-1'));
-    expect(await screen.findByText('Appointment cancelled')).toBeInTheDocument();
+    expect(await screen.findByText('Request cancelled')).toBeInTheDocument();
 
     await user.click(cancel());
-    expect(await screen.findByText('This appointment is already cancelled')).toBeInTheDocument();
+    expect(await screen.findByText('This request is already cancelled')).toBeInTheDocument();
     await user.click(cancel());
-    expect(await screen.findByText('Failed to cancel appointment')).toBeInTheDocument();
+    expect(await screen.findByText('Failed to cancel request')).toBeInTheDocument();
   });
 });

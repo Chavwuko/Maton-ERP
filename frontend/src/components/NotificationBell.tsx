@@ -62,7 +62,7 @@ export function NotificationBell() {
           {data && data.appointments.length > 0 && (
             <>
               <Text size="sm" fw={600}>
-                Appointments to review
+                Requests to review
                 <Badge ml={6} size="sm" color="yellow">
                   {data.counts.appointments}
                 </Badge>

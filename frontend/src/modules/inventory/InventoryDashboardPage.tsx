@@ -61,8 +61,8 @@ function Management({ dashboard }: { dashboard: ManagementDashboard }) {
   return (
     <Stack>
       <SimpleGrid cols={{ base: 1, sm: 3 }}>
-        <ActionCard label="Appointments awaiting review" value={actions.pendingAppointments} to="/appointments?tab=all" />
-        <ActionCard label="Appointments today" value={actions.todayAppointments} to="/appointments?tab=all" />
+        <ActionCard label="Requests awaiting review" value={actions.pendingAppointments} to="/appointments?tab=all" />
+        <ActionCard label="Requests today" value={actions.todayAppointments} to="/appointments?tab=all" />
         {hasRole(role, ['admin']) && (
           <ActionCard label="Sign-up requests waiting" value={actions.accessRequests} to="/users?tab=requests" />
         )}
@@ -140,7 +140,7 @@ function Management({ dashboard }: { dashboard: ManagementDashboard }) {
         </Stack>
 
         <Stack gap="xs">
-          <Title order={4}>Upcoming appointments</Title>
+          <Title order={4}>Upcoming requests</Title>
           <Table striped>
             <Table.Thead>
               <Table.Tr>
@@ -156,7 +156,7 @@ function Management({ dashboard }: { dashboard: ManagementDashboard }) {
               ))}
               {dashboard.upcoming.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={4}>No upcoming appointments.</Table.Td>
+                  <Table.Td colSpan={4}>No upcoming requests.</Table.Td>
                 </Table.Tr>
               )}
             </Table.Tbody>
@@ -210,7 +210,7 @@ function Mine({ dashboard }: { dashboard: MyDashboard }) {
       <Group justify="space-between">
         <Text>Hello, {dashboard.name}.</Text>
         <Button component={Link} to="/appointments">
-          Book an appointment
+          Make a request
         </Button>
       </Group>
 
@@ -223,7 +223,7 @@ function Mine({ dashboard }: { dashboard: MyDashboard }) {
 
       <SimpleGrid cols={{ base: 1, md: 2 }}>
         <Stack gap="xs">
-          <Title order={4}>Your upcoming appointments</Title>
+          <Title order={4}>Your upcoming requests</Title>
           <Table striped>
             <Table.Tbody>
               {dashboard.upcoming.map((appointment) => (

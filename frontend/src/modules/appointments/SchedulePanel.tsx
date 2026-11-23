@@ -86,7 +86,7 @@ export function SchedulePanel() {
         </Group>
         <Group grow align="flex-start">
           <NumberInput
-            label="Appointment length (minutes)"
+            label="Slot length (minutes)"
             description="10 to 240, in steps of 5"
             min={10}
             max={240}
@@ -94,7 +94,7 @@ export function SchedulePanel() {
             {...form.getInputProps('slotMinutes')}
           />
           <NumberInput
-            label="Appointments per slot"
+            label="Requests per slot"
             description="How many people the store can see at once"
             min={1}
             max={50}

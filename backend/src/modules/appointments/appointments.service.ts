@@ -102,7 +102,7 @@ export class AppointmentsService {
     const time = String(dto.time ?? '').trim();
     const subject = dto.subject?.trim();
     if (!subject) {
-      throw new BadRequestException('Please give your appointment a subject');
+      throw new BadRequestException('Please give your request a subject');
     }
 
     const schedule = await getSchedule(this.prisma);
@@ -116,7 +116,7 @@ export class AppointmentsService {
       throw new BadRequestException('Please choose a future date and time');
     }
     if (!schedule.workingDays.includes(dayOfWeek(dto.date))) {
-      throw new BadRequestException('Appointments are only available on working days');
+      throw new BadRequestException('Requests are only available on working days');
     }
 
     const lines = await this.cleanLines(this.prisma, dto.items ?? []);
@@ -130,7 +130,7 @@ export class AppointmentsService {
         throw new BadRequestException('That time slot is full. Please pick another');
       }
       if (taken.some((appointment) => appointment.requesterId === user.id)) {
-        throw new BadRequestException('You already have an appointment at that time');
+        throw new BadRequestException('You already have a request at that time');
       }
 
       return tx.appointment.create({
@@ -185,10 +185,10 @@ export class AppointmentsService {
     const appointment = await this.findOneOrThrow(id);
     const mine = appointment.requesterId === user.id;
     if (!mine && !STORE_ROLES.includes(user.roleName ?? '')) {
-      throw new ForbiddenException('You can only cancel your own appointments');
+      throw new ForbiddenException('You can only cancel your own requests');
     }
     if (!HOLDING_SLOT.includes(appointment.status)) {
-      throw new BadRequestException(`This appointment is already ${appointment.status.toLowerCase()}`);
+      throw new BadRequestException(`This request is already ${appointment.status.toLowerCase()}`);
     }
 
     const cancelled = await this.prisma.appointment.update({
@@ -220,7 +220,7 @@ export class AppointmentsService {
       APPROVED: ['DECLINED', 'COMPLETED'],
     };
     if (!allowed[appointment.status]?.includes(decision)) {
-      throw new BadRequestException(`This appointment is already ${appointment.status.toLowerCase()}`);
+      throw new BadRequestException(`This request is already ${appointment.status.toLowerCase()}`);
     }
     const feedback = dto.feedback?.trim();
     if ((decision === 'DECLINED' || decision === 'COMPLETED') && !feedback) {
@@ -277,7 +277,7 @@ export class AppointmentsService {
         },
       });
       if (moved.count === 0) {
-        throw new ConflictException('This appointment was just changed by someone else. Reload and try again');
+        throw new ConflictException('This request was just changed by someone else. Reload and try again');
       }
       return tx.appointment.findUniqueOrThrow({ where: { id }, include: INCLUDE });
     });
@@ -291,7 +291,7 @@ export class AppointmentsService {
       include: { requester: { select: { id: true, firstName: true, lastName: true, email: true } } },
     });
     if (!appointment) {
-      throw new NotFoundException(`Appointment ${id} not found`);
+      throw new NotFoundException(`Request ${id} not found`);
     }
     return appointment;
   }

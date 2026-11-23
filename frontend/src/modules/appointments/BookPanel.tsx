@@ -36,7 +36,7 @@ export function BookPanel() {
     },
     validate: {
       date: (value) => (value ? null : 'Choose a date'),
-      subject: (value) => (value.trim() ? null : 'Please give your appointment a subject'),
+      subject: (value) => (value.trim() ? null : 'Please give your request a subject'),
       items: {
         itemId: (value) => (value ? null : 'Choose an item'),
         quantity: (value) => (value === '' || Number(value) <= 0 ? 'Enter a quantity' : null),
@@ -69,13 +69,13 @@ export function BookPanel() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       queryClient.invalidateQueries({ queryKey: ['appointment-slots'] });
-      notifications.show({ message: 'Appointment booked. The store will review it.', color: 'green' });
+      notifications.show({ message: 'Request sent. The store will review it.', color: 'green' });
       form.reset();
       setSlot('');
     },
     onError: (err) => {
       queryClient.invalidateQueries({ queryKey: ['appointment-slots'] });
-      notifications.show({ message: err instanceof ApiError ? err.message : 'Failed to book appointment', color: 'red' });
+      notifications.show({ message: err instanceof ApiError ? err.message : 'Failed to send request', color: 'red' });
     },
   });
 
@@ -121,7 +121,7 @@ export function BookPanel() {
           )}
           {day && !day.working && (
             <Text size="sm" c="dimmed">
-              The store does not take appointments on this day. Please choose a working day.
+              The store does not take requests on this day. Please choose a working day.
             </Text>
           )}
           {day?.working && (
@@ -209,7 +209,7 @@ export function BookPanel() {
 
         <Group>
           <Button type="submit" loading={mutation.isPending}>
-            Book appointment
+            Send request
           </Button>
         </Group>
       </Stack>

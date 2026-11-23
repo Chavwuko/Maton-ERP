@@ -4,7 +4,7 @@
 
 // What the feature is called. Kept in one place because the word is due to
 // change (see the Roadmap), and emails should follow it.
-export const TERM = { singular: 'appointment', plural: 'appointments' };
+export const TERM = { singular: 'request', plural: 'requests', feature: 'Make Request' };
 const cap = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 
 export interface Person {
@@ -61,8 +61,8 @@ export function accessRejected(user: Person, reason: string | null): Email {
 // To the store when someone books.
 export function bookingCreated(booking: BookingMail): Email {
   return {
-    subject: `New ${TERM.singular} request — ${booking.subject}`,
-    body: `${personName(booking.requester)} booked "${booking.subject}" for ${when(booking)}. Open ${cap(TERM.plural)} to review it.`,
+    subject: `New ${TERM.singular} — ${booking.subject}`,
+    body: `${personName(booking.requester)} sent a request "${booking.subject}" for ${when(booking)}. Open ${TERM.feature} to review it.`,
   };
 }
 
