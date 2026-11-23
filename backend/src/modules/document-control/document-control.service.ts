@@ -34,6 +34,7 @@ export class DocumentControlService {
     departmentId?: string;
     projectId?: string;
     workOrderId?: string;
+    assetId?: string;
     invoiceId?: string;
     incidentId?: string;
     employeeId?: string;
@@ -46,6 +47,7 @@ export class DocumentControlService {
         departmentId: filters.departmentId,
         projectId: filters.projectId,
         workOrderId: filters.workOrderId,
+        assetId: filters.assetId,
         invoiceId: filters.invoiceId,
         incidentId: filters.incidentId,
         employeeId: filters.employeeId,
@@ -72,6 +74,10 @@ export class DocumentControlService {
       throw new BadRequestException('A file is required to create a document');
     }
 
+    if (dto.assetId && !(await this.prisma.asset.findUnique({ where: { id: dto.assetId } }))) {
+      throw new NotFoundException(`Asset ${dto.assetId} not found`);
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const document = await tx.document.create({
         data: {
@@ -79,6 +85,7 @@ export class DocumentControlService {
           departmentId: dto.departmentId,
           projectId: dto.projectId,
           workOrderId: dto.workOrderId,
+          assetId: dto.assetId,
           invoiceId: dto.invoiceId,
           incidentId: dto.incidentId,
           employeeId: dto.employeeId,

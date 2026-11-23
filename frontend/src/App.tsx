@@ -5,6 +5,8 @@ import { OrganizationsListPage } from './modules/organizations/OrganizationsList
 import { AppointmentsPage } from './modules/appointments/AppointmentsPage';
 import { AssetDetailPage } from './modules/assets/AssetDetailPage';
 import { AssetsListPage } from './modules/assets/AssetsListPage';
+import { AssetLabelsPage } from './modules/assets/AssetLabelsPage';
+import { AssetsDashboardPage } from './modules/assets/AssetsDashboardPage';
 import { AssetValuationPage } from './modules/assets/AssetValuationPage';
 import { MaintenanceDetailPage } from './modules/maintenance/MaintenanceDetailPage';
 import { MaintenanceListPage } from './modules/maintenance/MaintenanceListPage';
@@ -46,6 +48,8 @@ export default function App() {
         <Route path="/organizations" element={<OrganizationsListPage />} />
         <Route path="/organizations/:id" element={<OrganizationDetailPage />} />
         <Route path="/assets" element={<AssetsListPage />} />
+        <Route path="/assets/dashboard" element={<AssetsDashboardPage />} />
+        <Route path="/assets/labels" element={<AssetLabelsPage />} />
         <Route path="/assets/valuation" element={<AssetValuationPage />} />
         <Route path="/assets/:id" element={<AssetDetailPage />} />
         <Route path="/maintenance" element={<MaintenanceListPage />} />

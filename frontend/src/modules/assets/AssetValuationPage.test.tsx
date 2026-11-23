@@ -5,12 +5,14 @@ import { renderWithProviders } from '../../test/renderWithProviders';
 import { fireDate } from '../../test/fireDate';
 import { pickOption } from '../../test/pickOption';
 import { setCurrentRole } from '../../auth/roleStore';
+import { saveTextFile } from '../../lib/saveFile';
 import { ApiError } from '../../api/client';
 import * as assetsApi from '../../api/assets';
 import type { ValuationReport } from './types';
 import { AssetValuationPage } from './AssetValuationPage';
 
 vi.mock('../../api/assets');
+vi.mock('../../lib/saveFile', () => ({ saveTextFile: vi.fn() }));
 vi.mock('../../api/organizations', () => ({
   listOrganizations: vi.fn().mockResolvedValue([{ id: 'org-1', name: 'Acme', createdAt: '' }]),
 }));
@@ -124,5 +126,23 @@ describe('AssetValuationPage', () => {
 
     expect(screen.getByText('Asset values are not shown to your role.')).toBeInTheDocument();
     expect(assetsApi.getValuationReport).not.toHaveBeenCalled();
+  });
+
+  it('downloads the valuation for the day, organization and filter on screen', async () => {
+    const user = userEvent.setup();
+    vi.mocked(assetsApi.downloadValuationExport).mockResolvedValue({ filename: 'asset-valuation-2028-06-30.csv', text: 'a,b' });
+    renderWithProviders(<AssetValuationPage />);
+    await screen.findByText('Assets valued');
+
+    fireDate(screen.getByLabelText('Value as at'), '2028-06-30');
+    await user.click(screen.getByLabelText('Include decommissioned'));
+    await user.click(screen.getByRole('button', { name: 'Export CSV' }));
+
+    await waitFor(() => expect(saveTextFile).toHaveBeenCalledWith('asset-valuation-2028-06-30.csv', 'a,b'));
+    expect(vi.mocked(assetsApi.downloadValuationExport).mock.calls[0][0]).toEqual({
+      organizationId: undefined,
+      asOf: '2028-06-30',
+      includeDecommissioned: true,
+    });
   });
 });

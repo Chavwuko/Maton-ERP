@@ -825,4 +825,169 @@ describe('AssetsService', () => {
       });
     });
   });
+
+  describe('dashboard', () => {
+    // The generic groupBy signature defeats the deep mock's typing.
+    const groupBy = () => prisma.asset.groupBy as unknown as jest.Mock;
+    const dec = (value: string) => new Prisma.Decimal(value);
+    const lines = (csv: string) => csv.replace(/^\uFEFF/, '').trimEnd().split('\r\n');
+
+    beforeEach(() => {
+      prisma.appSetting.findMany.mockResolvedValue([]);
+    });
+
+    it('counts the register, and lists what needs attention', async () => {
+      groupBy()
+        .mockResolvedValueOnce([
+          { status: 'ACTIVE', _count: { _all: 7 } },
+          { status: 'DECOMMISSIONED', _count: { _all: 2 } },
+        ] as never)
+        .mockResolvedValueOnce([{ condition: 'GOOD', _count: { _all: 5 } }] as never);
+      prisma.assetAssignment.count.mockResolvedValueOnce(4).mockResolvedValueOnce(1);
+      prisma.assetAssignment.findMany.mockResolvedValue([{ id: 'asg-1' }] as never);
+      prisma.asset.count.mockResolvedValue(3);
+      // The warranty list first, then the register for its book value.
+      prisma.asset.findMany.mockResolvedValueOnce([{ id: 'a1', assetTag: 'PUMP-1' }] as never).mockResolvedValueOnce([
+        {
+          id: 'a1', assetTag: 'PUMP-1', name: 'Pump', category: 'Rotating', status: 'ACTIVE', purchaseDate: null, purchaseCost: dec('1000'),
+          depreciationMethod: 'NONE', usefulLifeMonths: null, salvageValue: null, depreciationStartDate: null,
+        },
+        { id: 'a2', assetTag: 'X', name: 'X', category: 'Rotating', status: 'ACTIVE', purchaseCost: null, depreciationMethod: 'NONE' },
+      ] as never);
+      prisma.workOrder.count.mockResolvedValue(6);
+      prisma.maintenanceSchedule.findMany.mockResolvedValue([
+        { active: true, nextDueDate: new Date('2020-01-01T00:00:00.000Z'), leadDays: 7 },
+        { active: true, nextDueDate: new Date('2999-01-01T00:00:00.000Z'), leadDays: 7 },
+        { active: true, nextDueDate: new Date(Date.now() + 2 * 86_400_000), leadDays: 7 },
+      ] as never);
+
+      const result = await service.dashboard({ organizationId: 'org-1' });
+
+      expect(result).toMatchObject({
+        assetCount: 9,
+        byStatus: [{ label: 'ACTIVE', count: 7 }, { label: 'DECOMMISSIONED', count: 2 }],
+        byCondition: [{ label: 'GOOD', count: 5 }],
+        checkedOut: 4,
+        overdueReturns: { count: 1, items: [{ id: 'asg-1' }] },
+        warrantyExpiring: { count: 3, items: [{ id: 'a1', assetTag: 'PUMP-1' }] },
+        maintenance: { openWorkOrders: 6, overdueSchedules: 1, dueSoonSchedules: 1 },
+      });
+      expect(result.totals.bookValue.toNumber()).toBe(1000);
+      expect(result.totals.notValued).toBe(1);
+      expect(prisma.workOrder.count).toHaveBeenCalledWith({ where: { organizationId: 'org-1', status: { in: ['OPEN', 'IN_PROGRESS', 'ON_HOLD'] } } });
+      expect(prisma.assetAssignment.count).toHaveBeenNthCalledWith(1, { where: { returnedAt: null, asset: { organizationId: 'org-1' } } });
+      expect(prisma.assetAssignment.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 10, orderBy: { expectedReturn: 'asc' } }));
+    });
+
+    it('is all zeros for an empty register', async () => {
+      groupBy().mockResolvedValue([]);
+      prisma.assetAssignment.count.mockResolvedValue(0);
+      prisma.assetAssignment.findMany.mockResolvedValue([]);
+      prisma.asset.count.mockResolvedValue(0);
+      prisma.asset.findMany.mockResolvedValue([]);
+      prisma.workOrder.count.mockResolvedValue(0);
+      prisma.maintenanceSchedule.findMany.mockResolvedValue([]);
+
+      const result = await service.dashboard({});
+
+      expect(result).toMatchObject({
+        assetCount: 0,
+        byStatus: [],
+        checkedOut: 0,
+        maintenance: { openWorkOrders: 0, overdueSchedules: 0, dueSoonSchedules: 0 },
+      });
+      expect(result.totals.bookValue.toNumber()).toBe(0);
+    });
+
+    describe('spreadsheets', () => {
+      const asset = (overrides = {}) => ({
+        id: 'a1',
+        assetTag: 'PUMP-1',
+        name: 'Pump, main',
+        category: 'Rotating',
+        status: 'ACTIVE',
+        condition: 'GOOD',
+        location: 'Bay 3',
+        make: 'Grundfos',
+        model: 'CR-45',
+        serialNumber: 'SN-1',
+        purchaseDate: new Date('2026-01-15T00:00:00.000Z'),
+        warrantyExpiry: new Date('2028-01-15T00:00:00.000Z'),
+        purchaseCost: dec('12000'),
+        salvageValue: dec('2000'),
+        depreciationMethod: 'STRAIGHT_LINE',
+        usefulLifeMonths: 60,
+        depreciationStartDate: null,
+        department: { id: 'd1', name: 'Plant' },
+        vendor: { id: 'v1', name: 'Apex' },
+        assignments: [{ assignee: { firstName: 'Ann', lastName: 'Store', email: 'a@b.test' }, department: null }],
+        ...overrides,
+      });
+
+      it('exports the register with its money columns', async () => {
+        jest.useFakeTimers({
+          now: new Date('2027-01-15T10:00:00.000Z'),
+          doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'queueMicrotask', 'hrtime', 'performance'],
+        });
+        prisma.asset.findMany.mockResolvedValue([asset()] as never);
+
+        const { filename, content } = await service.exportRegister({ organizationId: 'org-1', status: 'ACTIVE' }, true);
+        jest.useRealTimers();
+
+        expect(filename).toBe('assets-2027-01-15.csv');
+        expect(prisma.asset.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ where: expect.objectContaining({ organizationId: 'org-1', status: 'ACTIVE' }), orderBy: [{ category: 'asc' }, { assetTag: 'asc' }] }),
+        );
+        const [header, row] = lines(content);
+        expect(header.endsWith('Purchase cost,Salvage value,Depreciation,Accumulated depreciation,Book value')).toBe(true);
+        expect(row).toBe('PUMP-1,"Pump, main",Rotating,ACTIVE,GOOD,Bay 3,Plant,Grundfos,CR-45,SN-1,2026-01-15,Apex,2028-01-15,Ann Store,12000,2000,STRAIGHT_LINE,2000,10000');
+      });
+
+      it('leaves the money out for the staff role, and shows blanks and department holders', async () => {
+        prisma.asset.findMany.mockResolvedValue([
+          asset({
+            purchaseDate: null, warrantyExpiry: null, department: null, vendor: null, location: null,
+            assignments: [{ assignee: null, department: { name: 'Workshop' } }],
+          }),
+          asset({ assignments: [] }),
+        ] as never);
+
+        const { content } = await service.exportRegister({}, false);
+
+        const [header, first, second] = lines(content);
+        expect(header).toBe('Asset tag,Name,Category,Status,Condition,Location,Department,Make,Model,Serial number,Purchase date,Supplier,Warranty expires,Held by');
+        expect(first).toBe('PUMP-1,"Pump, main",Rotating,ACTIVE,GOOD,,,Grundfos,CR-45,SN-1,,,,Workshop');
+        expect(second.endsWith(',Apex,2028-01-15,')).toBe(true);
+      });
+
+      it('exports assets with no cost as blanks', async () => {
+        prisma.asset.findMany.mockResolvedValue([asset({ purchaseCost: null, salvageValue: null, depreciationMethod: 'NONE' })] as never);
+
+        const { content } = await service.exportRegister({}, true);
+
+        expect(lines(content)[1].endsWith(',,,NONE,,')).toBe(true);
+      });
+
+      it('exports the valuation with a totals row', async () => {
+        prisma.asset.findMany.mockResolvedValue([asset(), asset({ id: 'a2', assetTag: 'B', name: 'No cost', purchaseCost: null, depreciationMethod: 'NONE' })] as never);
+
+        const { filename, content } = await service.exportValuation({ asOf: '2027-01-15' });
+
+        expect(filename).toBe('asset-valuation-2027-01-15.csv');
+        const rows = lines(content);
+        expect(rows[0]).toBe('Asset tag,Name,Category,Status,Depreciation,Purchase cost,Accumulated depreciation,Book value,Fully depreciated');
+        expect(rows[1]).toBe('PUMP-1,"Pump, main",Rotating,ACTIVE,STRAIGHT_LINE,12000,2000,10000,No');
+        expect(rows[2]).toBe('B,No cost,Rotating,ACTIVE,NONE,,,,No');
+        expect(rows[3]).toBe(',Total,,,,12000,2000,10000,');
+      });
+
+      it('marks a fully depreciated asset', async () => {
+        prisma.asset.findMany.mockResolvedValue([asset()] as never);
+
+        const { content } = await service.exportValuation({ asOf: '2040-01-01' });
+
+        expect(lines(content)[1].endsWith(',2000,Yes')).toBe(true);
+      });
+    });
+  });
 });

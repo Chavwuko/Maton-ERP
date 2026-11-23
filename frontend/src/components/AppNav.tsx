@@ -24,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Assets',
     path: '/assets',
     children: [
+      { label: 'Dashboard', path: '/assets/dashboard' },
       { label: 'Register', path: '/assets', exact: true },
       { label: 'Valuation', path: '/assets/valuation' },
     ],

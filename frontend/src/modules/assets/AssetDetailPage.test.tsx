@@ -2,18 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../test/renderWithProviders';
-import { makeAsset, makeAssignment, makeSchedule, makeServiceHistory, makeValuation } from '../../test/fixtures';
+import { makeAsset, makeAssignment, makeDocument, makeSchedule, makeServiceHistory, makeValuation } from '../../test/fixtures';
 import { pickOption } from '../../test/pickOption';
 import { setCurrentRole } from '../../auth/roleStore';
 import { ApiError } from '../../api/client';
 import * as assetsApi from '../../api/assets';
 import * as maintenanceApi from '../../api/maintenance';
+import * as documentsApi from '../../api/documentControl';
 import * as usersApi from '../../api/users';
 import { fireDate } from '../../test/fireDate';
 import { AssetDetailPage } from './AssetDetailPage';
 
 vi.mock('../../api/assets');
 vi.mock('../../api/maintenance');
+vi.mock('../../api/documentControl');
 vi.mock('../../api/users');
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -49,6 +51,7 @@ describe('AssetDetailPage', () => {
     vi.mocked(assetsApi.getAssetServiceHistory).mockResolvedValue(makeServiceHistory());
     vi.mocked(assetsApi.getAssetValuation).mockResolvedValue(makeValuation());
     vi.mocked(maintenanceApi.listSchedules).mockResolvedValue([]);
+    vi.mocked(documentsApi.listDocuments).mockResolvedValue([]);
     vi.mocked(usersApi.listUsers).mockResolvedValue([
       { id: 'u-ann', email: 'ann@acme.test', firstName: 'Ann', lastName: 'Store', phone: null, isActive: true, status: 'ACTIVE', role: null, departmentId: null, department: null, requestedAt: null, rejectionReason: null, createdAt: '' },
     ]);
@@ -540,5 +543,112 @@ describe('AssetDetailPage', () => {
       expect(screen.queryByText('Valuation')).not.toBeInTheDocument();
       expect(assetsApi.getAssetValuation).not.toHaveBeenCalled();
     });
+  });
+
+  describe('photos and documents', () => {
+    const photo = makeDocument({
+      id: 'doc-2',
+      title: 'Nameplate',
+      versions: [{ ...makeDocument().versions![0], id: 'ver-2', documentId: 'doc-2', fileName: 'plate.jpg', mimeType: 'image/jpeg', fileSizeBytes: 3 * 1024 * 1024 }],
+    });
+
+    it('lists the files with their size, and says so when there are none', async () => {
+      const { unmount } = renderWithProviders(<AssetDetailPage />);
+      expect(await screen.findByText('No photos or documents yet.')).toBeInTheDocument();
+      expect(documentsApi.listDocuments).toHaveBeenCalledWith({ assetId: 'asset-1' });
+      unmount();
+
+      vi.mocked(documentsApi.listDocuments).mockResolvedValue([makeDocument(), photo, makeDocument({ id: 'doc-3', title: 'Empty', versions: [] })]);
+      renderWithProviders(<AssetDetailPage />);
+
+      expect(await screen.findByText('Manual')).toBeInTheDocument();
+      expect(screen.getByText('manual.pdf')).toBeInTheDocument();
+      expect(screen.getByText('(2 KB)')).toBeInTheDocument();
+      expect(screen.getByText('(3.0 MB)')).toBeInTheDocument();
+      expect(screen.getByText('Empty')).toBeInTheDocument();
+    });
+
+    it('shows a photo as a picture, using a link fetched for it', async () => {
+      vi.mocked(documentsApi.listDocuments).mockResolvedValue([photo]);
+      vi.mocked(documentsApi.getDownloadUrl).mockResolvedValue({ url: 'https://files.test/plate.jpg', fileName: 'plate.jpg' });
+
+      renderWithProviders(<AssetDetailPage />);
+
+      const image = await screen.findByAltText('Nameplate');
+      expect(image).toHaveAttribute('src', 'https://files.test/plate.jpg');
+      expect(documentsApi.getDownloadUrl).toHaveBeenCalledWith('doc-2', 'ver-2');
+    });
+
+    it('opens a download link, and surfaces a failure', async () => {
+      const user = userEvent.setup();
+      const open = vi.spyOn(window, 'open').mockReturnValue(null);
+      vi.mocked(documentsApi.listDocuments).mockResolvedValue([makeDocument()]);
+      vi.mocked(documentsApi.getDownloadUrl)
+        .mockResolvedValueOnce({ url: 'https://files.test/manual.pdf', fileName: 'manual.pdf' })
+        .mockRejectedValueOnce(new ApiError(404, 'Gone'))
+        .mockRejectedValueOnce(new Error('network'));
+      renderWithProviders(<AssetDetailPage />);
+
+      await user.click(await screen.findByRole('button', { name: 'Download Manual' }));
+      await waitFor(() => expect(open).toHaveBeenCalledWith('https://files.test/manual.pdf', '_blank'));
+
+      await user.click(screen.getByRole('button', { name: 'Download Manual' }));
+      expect(await screen.findByText('Gone')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Download Manual' }));
+      expect(await screen.findByText('Failed to get the download link')).toBeInTheDocument();
+      open.mockRestore();
+    });
+
+    it('lets a manager add a file to the asset', async () => {
+      const user = userEvent.setup();
+      const file = new File(['x'], 'plate.jpg', { type: 'image/jpeg' });
+      vi.mocked(documentsApi.createDocument).mockResolvedValue(makeDocument());
+      renderWithProviders(<AssetDetailPage />);
+
+      await user.click(await screen.findByRole('button', { name: 'Add a file' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Add a file to PUMP-001' });
+      await user.click(within(dialog).getByRole('button', { name: 'Add' }));
+      expect(await within(dialog).findByText('Title is required')).toBeInTheDocument();
+      expect(within(dialog).getByText('A file is required')).toBeInTheDocument();
+      expect(documentsApi.createDocument).not.toHaveBeenCalled();
+
+      await user.type(within(dialog).getByLabelText('Title', { exact: false }), ' Nameplate ');
+      await user.upload(document.body.querySelector<HTMLInputElement>('input[type="file"]')!, file);
+      await user.click(within(dialog).getByRole('button', { name: 'Add' }));
+
+      await waitFor(() => expect(documentsApi.createDocument).toHaveBeenCalledWith({ organizationId: 'org-1', assetId: 'asset-1', title: 'Nameplate' }, file));
+      expect(await screen.findByText('File added')).toBeInTheDocument();
+    });
+
+    it('surfaces an upload failure', async () => {
+      const user = userEvent.setup();
+      vi.mocked(documentsApi.createDocument).mockRejectedValueOnce(new Error('Request failed with status 500'));
+      renderWithProviders(<AssetDetailPage />);
+
+      await user.click(await screen.findByRole('button', { name: 'Add a file' }));
+      const dialog = await screen.findByRole('dialog');
+      await user.type(within(dialog).getByLabelText('Title', { exact: false }), 'Plate');
+      await user.upload(document.body.querySelector<HTMLInputElement>('input[type="file"]')!, new File(['x'], 'a.txt'));
+      await user.click(within(dialog).getByRole('button', { name: 'Add' }));
+
+      expect(await screen.findByText('Failed to add the file')).toBeInTheDocument();
+    });
+
+    it('does not offer uploading to people who only look', async () => {
+      setCurrentRole('hse');
+
+      renderWithProviders(<AssetDetailPage />);
+
+      await screen.findByText('No photos or documents yet.');
+      expect(screen.queryByRole('button', { name: 'Add a file' })).not.toBeInTheDocument();
+    });
+  });
+
+  it('links to a printable label for the asset, for everyone', async () => {
+    setCurrentRole('hse');
+
+    renderWithProviders(<AssetDetailPage />);
+
+    expect(await screen.findByRole('link', { name: 'Print label' })).toHaveAttribute('href', '/assets/labels?ids=asset-1');
   });
 });

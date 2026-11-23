@@ -4,6 +4,7 @@ export class CreateDocumentDto {
   departmentId?: string;
   projectId?: string;
   workOrderId?: string;
+  assetId?: string;
   invoiceId?: string;
   incidentId?: string;
   employeeId?: string;

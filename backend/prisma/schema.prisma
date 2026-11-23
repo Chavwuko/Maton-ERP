@@ -278,6 +278,7 @@ model Asset {
   incidents    Incident[]
   assignments  AssetAssignment[]
   schedules    MaintenanceSchedule[]
+  documents    Document[]
 
   @@unique([organizationId, assetTag])
   // Postgres lets several rows have no serial number; real ones stay unique.
@@ -370,6 +371,8 @@ model Document {
   // or ?workOrderId=... without a separate join table.
   projectId        String?
   workOrderId      String?
+  // An asset's photos, manuals and certificates: GET /documents?assetId=...
+  assetId          String?
   invoiceId        String?
   incidentId       String?
   // Set when an employee self-submits a personal HR document (ID, cert,
@@ -393,6 +396,7 @@ model Document {
   department     Department?       @relation(fields: [departmentId], references: [id])
   project        Project?          @relation(fields: [projectId], references: [id])
   workOrder      WorkOrder?        @relation(fields: [workOrderId], references: [id])
+  asset          Asset?            @relation(fields: [assetId], references: [id])
   invoice        Invoice?          @relation(fields: [invoiceId], references: [id])
   incident       Incident?         @relation(fields: [incidentId], references: [id])
   employee       Employee?         @relation(fields: [employeeId], references: [id])

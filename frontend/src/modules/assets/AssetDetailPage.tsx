@@ -5,6 +5,7 @@ import { Alert, Anchor, Badge, Button, Group, Loader, Paper, SimpleGrid, Stack, 
 import { ApiError } from '../../api/client';
 import { getAsset, getAssetHistory, getAssetServiceHistory, getAssetValuation, listAssetAssignments } from '../../api/assets';
 import { listSchedules } from '../../api/maintenance';
+import { listDocuments } from '../../api/documentControl';
 import { StatCard } from '../../components/StatCard';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useRole } from '../../auth/RoleContext';
@@ -12,10 +13,11 @@ import { hasRole } from '../../auth/roleStore';
 import { formatMoney, formatQty } from '../inventory/format';
 import { ScheduleDialog } from '../maintenance/ScheduleDialog';
 import { DUE_STATUS_COLORS, intervalLabel, WORK_ORDER_STATUS_COLORS } from '../maintenance/types';
-import { CheckInDialog, CheckOutDialog, EditAssetDialog } from './AssetDialogs';
+import { AttachmentDialog, CheckInDialog, CheckOutDialog, EditAssetDialog } from './AssetDialogs';
+import { Attachments } from './Attachments';
 import { ASSET_CONDITION_COLORS, ASSET_STATUS_COLORS, DEPRECIATION_METHODS, assetDate, holderName } from './types';
 
-type Dialog = 'edit' | 'check-out' | 'check-in' | 'schedule' | null;
+type Dialog = 'edit' | 'check-out' | 'check-in' | 'schedule' | 'attach' | null;
 
 export function AssetDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -37,6 +39,12 @@ export function AssetDetailPage() {
   const { data: custody } = useQuery({
     queryKey: ['assets', id, 'assignments'],
     queryFn: () => listAssetAssignments(id!),
+    enabled: !!id,
+  });
+
+  const { data: attachments } = useQuery({
+    queryKey: ['documents', { assetId: id }],
+    queryFn: () => listDocuments({ assetId: id }),
     enabled: !!id,
   });
 
@@ -107,8 +115,12 @@ export function AssetDetailPage() {
             {asset.condition}
           </Badge>
         </Group>
-        {canManage && (
-          <Group>
+        <Group>
+          <Button component={Link} to={`/assets/labels?ids=${asset.id}`} variant="subtle" size="xs">
+            Print label
+          </Button>
+          {canManage && (
+            <>
             <Button variant="light" size="xs" onClick={() => setDialog('edit')}>
               Edit
             </Button>
@@ -123,8 +135,9 @@ export function AssetDetailPage() {
                 </Button>
               )
             )}
-          </Group>
-        )}
+            </>
+          )}
+        </Group>
       </Group>
 
       <Paper withBorder p="md" radius="md">
@@ -350,6 +363,16 @@ export function AssetDetailPage() {
         </Table.Tbody>
       </Table>
 
+      <Group justify="space-between">
+        <Title order={4}>Photos and documents</Title>
+        {canManage && (
+          <Button variant="light" size="xs" onClick={() => setDialog('attach')}>
+            Add a file
+          </Button>
+        )}
+      </Group>
+      <Attachments documents={attachments ?? []} />
+
       {canManage && (
         <>
           <Title order={4}>Change history</Title>
@@ -387,6 +410,7 @@ export function AssetDetailPage() {
           {dialog === 'edit' && <EditAssetDialog asset={asset} opened onClose={() => setDialog(null)} />}
           {dialog === 'check-out' && <CheckOutDialog asset={asset} opened onClose={() => setDialog(null)} />}
           {dialog === 'check-in' && <CheckInDialog asset={asset} opened onClose={() => setDialog(null)} />}
+          {dialog === 'attach' && <AttachmentDialog asset={asset} opened onClose={() => setDialog(null)} />}
           {dialog === 'schedule' && <ScheduleDialog assetId={asset.id} opened onClose={() => setDialog(null)} />}
         </>
       )}

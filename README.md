@@ -258,7 +258,35 @@ own settings, so changing them re-values it at once.
 - Both valuation endpoints, and `salvageValue` on asset responses, are closed
   to the `staff` role like every other cost.
 
-**Frontend**: `/assets` has search, status and condition filters and an
+### Dashboard, spreadsheets, photos and labels
+
+- `GET /assets/dashboard?organizationId?` — open to every role: `assetCount`,
+  `byStatus` and `byCondition` (in-service assets) as `{label, count}` lists,
+  `checkedOut`, `overdueReturns` and `warrantyExpiring` (60 days) each with a
+  `count` and the first ten `items`, `maintenance` (`openWorkOrders`,
+  `overdueSchedules`, `dueSoonSchedules`) and `totals` (`bookValue`,
+  `notValued`; `bookValue` is left out for the `staff` role like every cost).
+- `GET /assets/export` — the register as a CSV download, with the same filters
+  as the list (`organizationId`, `status`, `projectId`, `departmentId`,
+  `condition`, `search`) and who holds each asset. Money columns (cost,
+  salvage, depreciation, book value) are left out for the `staff` role.
+  `GET /assets/valuation/export` — the valuation report as a CSV with a totals
+  row (closed to `staff`). Text cells that look like formulas are neutralised.
+- **Photos and documents**: a document can be attached to an asset with
+  `assetId` on `POST /documents` (404 for an unknown asset) and listed with
+  `GET /documents?assetId=...`. It uses the normal document storage and
+  versioning, so a photo, manual or certificate gets a signed download link.
+- **Labels**: `/assets/labels?ids=a,b` prints a sheet of labels, each with a
+  QR code that opens the asset's page (`/assets/:id`), so scanning a sticker
+  brings up its record. With no `ids` it labels every asset in service.
+
+**Frontend**: Assets > Dashboard (`/assets/dashboard`) shows the numbers, status
+and condition charts, overdue returns and warranties ending soon. The register
+has Export CSV and tick-boxes for Print labels; Valuation has Export CSV; an
+asset's page has Print label and, for admin/maintenance, Add a file, with photos
+shown as pictures.
+
+**Frontend** (register): `/assets` has search, status and condition filters and an
 "Assigned to me" switch, with a full "New asset" form. An asset's page shows
 the whole record, who holds it, the custody history, work orders and (for
 admin/maintenance) the change history, with Edit, Check out and Check in; see

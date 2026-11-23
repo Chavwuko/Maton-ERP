@@ -4,6 +4,8 @@ import { asRole } from './utils/auth';
 import { createTestApp } from './utils/test-app';
 
 const inDays = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+// The server judges "today" in the store's time zone (Africa/Lagos by default), which is a day ahead of UTC for an hour each evening.
+const storeToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Lagos' });
 const plusDays = (iso: string, days: number) => new Date(Date.parse(`${iso}T00:00:00.000Z`) + days * 86_400_000).toISOString().slice(0, 10);
 
 // Preventive maintenance schedules, the work orders they open, and the service
@@ -151,7 +153,7 @@ describe('Maintenance schedules (e2e)', () => {
 
       const after = (await staff.get(`/maintenance-schedules/${scheduleId}`)).body;
       expect(after.nextDueDate.slice(0, 10)).toBe(plusDays(dueDate, 30));
-      expect(after.lastCompletedDate.slice(0, 10)).toBe(inDays(0));
+      expect(after.lastCompletedDate.slice(0, 10)).toBe(storeToday());
       expect(after.dueStatus).toBe('UPCOMING');
     });
 

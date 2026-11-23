@@ -1,7 +1,7 @@
 import { apiClient } from './client';
 import type { ActivityEntry } from '../modules/users/activityTypes';
 import type { ServiceHistory } from '../modules/maintenance/types';
-import type { Asset, AssetAssignment, AssetCondition, AssetStatus, AssetValuation, DepreciationMethod, ValuationReport } from '../modules/assets/types';
+import type { Asset, AssetAssignment, AssetCondition, AssetDashboard, AssetStatus, AssetValuation, DepreciationMethod, ValuationReport } from '../modules/assets/types';
 
 export interface AssetFields {
   location?: string | null;
@@ -95,4 +95,27 @@ export function getValuationReport(filters: { organizationId?: string; asOf?: st
   if (filters.includeDecommissioned) params.set('includeDecommissioned', 'true');
   const qs = params.toString();
   return apiClient.get<ValuationReport>(`/assets/valuation${qs ? `?${qs}` : ''}`);
+}
+
+export function getAssetDashboard(organizationId?: string) {
+  return apiClient.get<AssetDashboard>(`/assets/dashboard${organizationId ? `?organizationId=${organizationId}` : ''}`);
+}
+
+// The register as a spreadsheet, filtered like the list.
+export function downloadAssetExport(filters: { search?: string; status?: AssetStatus; condition?: AssetCondition } = {}) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+  const qs = params.toString();
+  return apiClient.download(`/assets/export${qs ? `?${qs}` : ''}`);
+}
+
+export function downloadValuationExport(filters: { organizationId?: string; asOf?: string; includeDecommissioned?: boolean } = {}) {
+  const params = new URLSearchParams();
+  if (filters.organizationId) params.set('organizationId', filters.organizationId);
+  if (filters.asOf) params.set('asOf', filters.asOf);
+  if (filters.includeDecommissioned) params.set('includeDecommissioned', 'true');
+  const qs = params.toString();
+  return apiClient.download(`/assets/valuation/export${qs ? `?${qs}` : ''}`);
 }

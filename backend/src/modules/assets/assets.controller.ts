@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseInterceptors } from '@nestjs/common';
-import type { Request } from 'express';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, Res, UseInterceptors } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { Roles } from '../../auth/roles.guard';
 import { ASSIGNABLE_ROLES } from '../users/user-roles';
 import { StaffCostRedactionInterceptor } from '../inventory/staff-cost-redaction.interceptor';
@@ -28,6 +28,42 @@ export class AssetsController {
     @Query('search') search?: string,
   ) {
     return this.assetsService.findAll({ organizationId, status, projectId, departmentId, condition, assignedToId, search });
+  }
+
+  @Get('dashboard')
+  dashboard(@Query('organizationId') organizationId?: string) {
+    return this.assetsService.dashboard({ organizationId });
+  }
+
+  // The register as a spreadsheet; staff get it without the money columns.
+  @Get('export')
+  async exportRegister(
+    @Query('organizationId') organizationId: string | undefined,
+    @Query('status') status: string | undefined,
+    @Query('projectId') projectId: string | undefined,
+    @Query('departmentId') departmentId: string | undefined,
+    @Query('condition') condition: string | undefined,
+    @Query('search') search: string | undefined,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { filename, content } = await this.assetsService.exportRegister(
+      { organizationId, status, projectId, departmentId, condition, search },
+      req.user!.roleName !== 'staff',
+    );
+    return this.asCsv(res, filename, content);
+  }
+
+  @Roles(...ASSIGNABLE_ROLES.filter((role) => role !== 'staff'))
+  @Get('valuation/export')
+  async exportValuation(
+    @Query('organizationId') organizationId: string | undefined,
+    @Query('asOf') asOf: string | undefined,
+    @Query('includeDecommissioned') includeDecommissioned: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { filename, content } = await this.assetsService.exportValuation({ organizationId, asOf, includeDecommissioned });
+    return this.asCsv(res, filename, content);
   }
 
   // Book values are money, which the `staff` role never sees. Declared before
@@ -67,6 +103,12 @@ export class AssetsController {
   @Get(':id/service-history')
   serviceHistory(@Param('id') id: string) {
     return this.assetsService.serviceHistory(id);
+  }
+
+  private asCsv(res: Response, filename: string, content: string) {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return content;
   }
 
   @Roles('admin', 'maintenance')

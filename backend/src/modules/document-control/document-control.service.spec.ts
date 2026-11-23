@@ -29,10 +29,10 @@ describe('DocumentControlService', () => {
       const documents = [{ id: 'doc-1' }];
       prisma.document.findMany.mockResolvedValue(documents as never);
 
-      const result = await service.findAll({ organizationId: 'org-1', projectId: 'p1' });
+      const result = await service.findAll({ organizationId: 'org-1', projectId: 'p1', assetId: 'a1' });
 
       expect(prisma.document.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ organizationId: 'org-1', projectId: 'p1' }) }),
+        expect.objectContaining({ where: expect.objectContaining({ organizationId: 'org-1', projectId: 'p1', assetId: 'a1' }) }),
       );
       expect(result).toEqual(documents);
     });
@@ -66,6 +66,26 @@ describe('DocumentControlService', () => {
         'text/plain',
       );
       expect(result).toEqual({ id: 'doc-1', currentVersion: 1 });
+    });
+
+    it('attaches the document to an asset that exists', async () => {
+      prisma.asset.findUnique.mockResolvedValue({ id: 'a1' } as never);
+      prisma.document.create.mockResolvedValue({ id: 'doc-1' } as never);
+      prisma.documentVersion.create.mockResolvedValue({} as never);
+      prisma.document.findUniqueOrThrow.mockResolvedValue({ id: 'doc-1' } as never);
+
+      await service.create({ organizationId: 'org-1', title: 't', assetId: 'a1' }, 'user-1', fakeFile());
+
+      expect(prisma.document.create).toHaveBeenCalledWith({ data: expect.objectContaining({ assetId: 'a1' }) });
+    });
+
+    it('404s for an asset that does not exist, without storing the file', async () => {
+      prisma.asset.findUnique.mockResolvedValue(null);
+
+      await expect(service.create({ organizationId: 'org-1', title: 't', assetId: 'nope' }, 'user-1', fakeFile())).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(storage.putObject).not.toHaveBeenCalled();
     });
   });
 

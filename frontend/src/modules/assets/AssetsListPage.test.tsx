@@ -5,9 +5,17 @@ import { renderWithProviders } from '../../test/renderWithProviders';
 import { makeAsset, makeAssignment } from '../../test/fixtures';
 import { pickOption } from '../../test/pickOption';
 import { setCurrentRole } from '../../auth/roleStore';
+import { saveTextFile } from '../../lib/saveFile';
 import { ApiError } from '../../api/client';
 import * as assetsApi from '../../api/assets';
 import { AssetsListPage } from './AssetsListPage';
+
+const navigate = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return { ...actual, useNavigate: () => navigate };
+});
+vi.mock('../../lib/saveFile', () => ({ saveTextFile: vi.fn() }));
 
 vi.mock('../../api/assets');
 vi.mock('../../api/organizations', () => ({
@@ -308,6 +316,50 @@ describe('AssetsListPage', () => {
 
       await user.click(within(dialog).getByRole('button', { name: 'Create' }));
       expect(await screen.findByText('Failed to create asset')).toBeInTheDocument();
+    });
+  });
+
+  describe('spreadsheet and labels', () => {
+    it('downloads the register with the filters that are on screen', async () => {
+      const user = userEvent.setup();
+      vi.mocked(assetsApi.downloadAssetExport).mockResolvedValue({ filename: 'assets-2026-10-27.csv', text: 'a,b' });
+      renderWithProviders(<AssetsListPage />);
+      await screen.findByText('PUMP-001');
+
+      await user.type(screen.getByLabelText('Search'), ' pump ');
+      await user.click(screen.getByRole('button', { name: 'Export CSV' }));
+
+      await waitFor(() => expect(saveTextFile).toHaveBeenCalledWith('assets-2026-10-27.csv', 'a,b'));
+      expect(vi.mocked(assetsApi.downloadAssetExport).mock.calls[0][0]).toEqual({ search: 'pump', status: undefined, condition: undefined });
+    });
+
+    it('says so when the export fails', async () => {
+      const user = userEvent.setup();
+      vi.mocked(assetsApi.downloadAssetExport).mockRejectedValueOnce(new ApiError(500, 'Server down')).mockRejectedValueOnce(new Error('network'));
+      renderWithProviders(<AssetsListPage />);
+      await screen.findByText('PUMP-001');
+
+      await user.click(screen.getByRole('button', { name: 'Export CSV' }));
+      expect(await screen.findByText('Server down')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Export CSV' }));
+      expect(await screen.findByText('Failed to export assets')).toBeInTheDocument();
+    });
+
+    it('prints labels for the assets that are ticked', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<AssetsListPage />);
+      await screen.findByText('PUMP-001');
+      expect(screen.getByRole('button', { name: 'Print labels' })).toBeDisabled();
+
+      await user.click(screen.getByLabelText('Select PUMP-001'));
+      await user.click(screen.getByLabelText('Select LATHE-7'));
+      await user.click(screen.getByRole('button', { name: 'Print labels (2)' }));
+      expect(navigate).toHaveBeenLastCalledWith('/assets/labels?ids=asset-1,asset-2');
+
+      await user.click(screen.getByLabelText('Select PUMP-001'));
+      await user.click(screen.getByRole('button', { name: 'Print labels (1)' }));
+      expect(navigate).toHaveBeenLastCalledWith('/assets/labels?ids=asset-2');
     });
   });
 });

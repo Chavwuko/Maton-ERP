@@ -19,6 +19,7 @@ describe('StaffCostRedactionInterceptor', () => {
     stockValue: '38.40',
     purchaseCost: '900.00',
     salvageValue: '100.00',
+    bookValue: '800.00',
     totalOnHand: 8,
     createdAt,
     category: null,

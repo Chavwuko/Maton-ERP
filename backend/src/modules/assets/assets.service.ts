@@ -3,6 +3,8 @@ import { Asset, AssetCondition, AssetStatus, DepreciationMethod, Prisma } from '
 import type { AuthenticatedUser } from '../../auth/cognito-auth.guard';
 import { PrismaService } from '../../database/prisma.service';
 import { getSchedule, isValidDateString, nowIn } from '../appointments/appointment-schedule';
+import { addDays, dayString, dueStatus } from '../maintenance/schedules/schedule-dates';
+import { toCsv } from '../reports/csv';
 import { valueAt, yearlySchedule, type Depreciable } from './asset-valuation';
 import { CheckInAssetDto } from './dto/check-in-asset.dto';
 import { CheckOutAssetDto } from './dto/check-out-asset.dto';
@@ -42,43 +44,133 @@ const holderName = (assignment: { assignee: { firstName: string; lastName: strin
     ? `${assignment.assignee.firstName} ${assignment.assignee.lastName}`.trim() || assignment.assignee.email
     : (assignment.department?.name ?? 'someone');
 
+const WARRANTY_WARNING_DAYS = 60;
+const DASHBOARD_LIST_SIZE = 10;
+
+export interface AssetFilters {
+  organizationId?: string;
+  status?: string;
+  projectId?: string;
+  departmentId?: string;
+  condition?: string;
+  assignedToId?: string;
+  search?: string;
+}
+
 @Injectable()
 export class AssetsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(filters: {
-    organizationId?: string;
-    status?: string;
-    projectId?: string;
-    departmentId?: string;
-    condition?: string;
-    assignedToId?: string;
-    search?: string;
-  }) {
-    this.assertEnum(filters.status, STATUSES, 'status');
-    this.assertEnum(filters.condition, CONDITIONS, 'condition');
-    const search = filters.search?.trim();
-
+  async findAll(filters: AssetFilters) {
     const assets = await this.prisma.asset.findMany({
-      where: {
-        organizationId: filters.organizationId,
-        status: filters.status as AssetStatus | undefined,
-        projectId: filters.projectId,
-        departmentId: filters.departmentId,
-        condition: filters.condition as AssetCondition | undefined,
-        assignments: filters.assignedToId ? { some: { assigneeId: filters.assignedToId, returnedAt: null } } : undefined,
-        OR: search
-          ? [
-              { assetTag: { contains: search, mode: 'insensitive' } },
-              { name: { contains: search, mode: 'insensitive' } },
-              { serialNumber: { contains: search, mode: 'insensitive' } },
-            ]
-          : undefined,
-      },
+      where: this.listWhere(filters),
       include: LIST_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });
     return assets.map(present);
+  }
+
+  // The register as a spreadsheet, with the same filters as the list. Money
+  // columns are left out for the staff role.
+  async exportRegister(filters: AssetFilters, includeMoney: boolean) {
+    const day = await this.asOfDay();
+    const assets = await this.prisma.asset.findMany({
+      where: this.listWhere(filters),
+      include: LIST_INCLUDE,
+      orderBy: [{ category: 'asc' }, { assetTag: 'asc' }],
+    });
+    const headers = [
+      'Asset tag', 'Name', 'Category', 'Status', 'Condition', 'Location', 'Department', 'Make', 'Model', 'Serial number',
+      'Purchase date', 'Supplier', 'Warranty expires', 'Held by',
+      ...(includeMoney ? ['Purchase cost', 'Salvage value', 'Depreciation', 'Accumulated depreciation', 'Book value'] : []),
+    ];
+    const rows = assets.map((asset) => {
+      const value = this.valued(asset, day);
+      return [
+        asset.assetTag, asset.name, asset.category, asset.status, asset.condition, asset.location, asset.department?.name,
+        asset.make, asset.model, asset.serialNumber, this.isoDate(asset.purchaseDate), asset.vendor?.name,
+        this.isoDate(asset.warrantyExpiry), asset.assignments[0] ? holderName(asset.assignments[0]) : '',
+        ...(includeMoney
+          ? [
+              asset.purchaseCost?.toNumber(), asset.salvageValue?.toNumber(), asset.depreciationMethod,
+              value.accumulatedDepreciation?.toNumber(), value.bookValue?.toNumber(),
+            ]
+          : []),
+      ];
+    });
+    return { filename: `assets-${day}.csv`, content: toCsv(headers, rows) };
+  }
+
+  // The valuation report as a spreadsheet, with a totals row.
+  async exportValuation(filters: { organizationId?: string; asOf?: string; includeDecommissioned?: string }) {
+    const report = await this.valuationReport(filters);
+    const headers = ['Asset tag', 'Name', 'Category', 'Status', 'Depreciation', 'Purchase cost', 'Accumulated depreciation', 'Book value', 'Fully depreciated'];
+    const rows = report.rows.map((row) => [
+      row.assetTag, row.name, row.category, row.status, row.method, row.cost?.toNumber(), row.accumulatedDepreciation?.toNumber(),
+      row.bookValue?.toNumber(), row.fullyDepreciated ? 'Yes' : 'No',
+    ]);
+    const { totals } = report;
+    rows.push(['', 'Total', '', '', '', totals.cost.toNumber(), totals.accumulatedDepreciation.toNumber(), totals.bookValue.toNumber(), '']);
+    return { filename: `asset-valuation-${report.asOf}.csv`, content: toCsv(headers, rows) };
+  }
+
+  // The asset overview: how many, in what state, what needs attention, and
+  // what the register is worth.
+  async dashboard(filters: { organizationId?: string }) {
+    const day = await this.asOfDay();
+    const today = new Date(`${day}T00:00:00.000Z`);
+    const organizationId = filters.organizationId;
+    const warrantyWhere: Prisma.AssetWhereInput = {
+      organizationId,
+      status: { not: 'DECOMMISSIONED' },
+      warrantyExpiry: { gte: today, lte: addDays(today, WARRANTY_WARNING_DAYS) },
+    };
+    const overdueWhere: Prisma.AssetAssignmentWhereInput = { returnedAt: null, expectedReturn: { lt: today }, asset: { organizationId } };
+
+    const [byStatus, byCondition, checkedOut, overdueCount, overdueItems, warrantyCount, warrantyItems, openWorkOrders, schedules, valuation] =
+      await Promise.all([
+        this.prisma.asset.groupBy({ by: ['status'], where: { organizationId }, _count: { _all: true } }),
+        this.prisma.asset.groupBy({ by: ['condition'], where: { organizationId, status: { not: 'DECOMMISSIONED' } }, _count: { _all: true } }),
+        this.prisma.assetAssignment.count({ where: { returnedAt: null, asset: { organizationId } } }),
+        this.prisma.assetAssignment.count({ where: overdueWhere }),
+        this.prisma.assetAssignment.findMany({
+          where: overdueWhere,
+          include: { asset: { select: { id: true, assetTag: true, name: true } }, assignee: PERSON, department: NAMED },
+          orderBy: { expectedReturn: 'asc' },
+          take: DASHBOARD_LIST_SIZE,
+        }),
+        this.prisma.asset.count({ where: warrantyWhere }),
+        this.prisma.asset.findMany({
+          where: warrantyWhere,
+          select: { id: true, assetTag: true, name: true, warrantyExpiry: true },
+          orderBy: { warrantyExpiry: 'asc' },
+          take: DASHBOARD_LIST_SIZE,
+        }),
+        this.prisma.workOrder.count({ where: { organizationId, status: { in: ['OPEN', 'IN_PROGRESS', 'ON_HOLD'] } } }),
+        this.prisma.maintenanceSchedule.findMany({
+          where: { organizationId, active: true, asset: { status: { not: 'DECOMMISSIONED' } } },
+          select: { active: true, nextDueDate: true, leadDays: true },
+        }),
+        this.valuationReport({ organizationId, asOf: day }),
+      ]);
+
+    const standing = schedules.map((schedule) => dueStatus(schedule, day));
+    return {
+      asOf: day,
+      // Not `total`: the staff cost filter strips every field with that name.
+      assetCount: byStatus.reduce((sum, row) => sum + row._count._all, 0),
+      byStatus: byStatus.map((row) => ({ label: row.status, count: row._count._all })),
+      byCondition: byCondition.map((row) => ({ label: row.condition, count: row._count._all })),
+      checkedOut,
+      overdueReturns: { count: overdueCount, items: overdueItems },
+      warrantyExpiring: { count: warrantyCount, items: warrantyItems },
+      maintenance: {
+        openWorkOrders,
+        overdueSchedules: standing.filter((status) => status === 'OVERDUE').length,
+        dueSoonSchedules: standing.filter((status) => status === 'DUE_SOON').length,
+      },
+      totals: { bookValue: valuation.totals.bookValue, notValued: valuation.totals.notValued },
+    };
   }
 
   // What the signed-in person is holding right now.
@@ -348,6 +440,31 @@ export class AssetsService {
   }
 
   // --- helpers ---------------------------------------------------------------
+
+  private listWhere(filters: AssetFilters): Prisma.AssetWhereInput {
+    this.assertEnum(filters.status, STATUSES, 'status');
+    this.assertEnum(filters.condition, CONDITIONS, 'condition');
+    const search = filters.search?.trim();
+    return {
+      organizationId: filters.organizationId,
+      status: filters.status as AssetStatus | undefined,
+      projectId: filters.projectId,
+      departmentId: filters.departmentId,
+      condition: filters.condition as AssetCondition | undefined,
+      assignments: filters.assignedToId ? { some: { assigneeId: filters.assignedToId, returnedAt: null } } : undefined,
+      OR: search
+        ? [
+            { assetTag: { contains: search, mode: 'insensitive' } },
+            { name: { contains: search, mode: 'insensitive' } },
+            { serialNumber: { contains: search, mode: 'insensitive' } },
+          ]
+        : undefined,
+    };
+  }
+
+  private isoDate(date: Date | null): string {
+    return date ? dayString(date) : '';
+  }
 
   // The depreciation inputs, or null when the asset is not being depreciated.
   private depreciable(asset: Asset): Depreciable | null {

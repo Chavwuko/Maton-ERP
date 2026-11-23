@@ -15,6 +15,9 @@ describe('AssetsController', () => {
       history: jest.fn(),
       serviceHistory: jest.fn(),
       valuation: jest.fn(),
+      dashboard: jest.fn(),
+      exportRegister: jest.fn(),
+      exportValuation: jest.fn(),
       valuationReport: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
@@ -79,5 +82,44 @@ describe('AssetsController', () => {
 
     expect(service.valuation).toHaveBeenCalledWith('a1', '2027-01-15');
     expect(service.valuationReport).toHaveBeenCalledWith({ organizationId: 'org-1', asOf: '2027-01-15', includeDecommissioned: 'true' });
+  });
+
+  describe('dashboard and spreadsheets', () => {
+    const res = () => ({ setHeader: jest.fn() }) as never;
+
+    it('dashboard forwards the organization', () => {
+      controller.dashboard('org-1');
+
+      expect(service.dashboard).toHaveBeenCalledWith({ organizationId: 'org-1' });
+    });
+
+    it('exports the register as a download, with money unless the role is staff', async () => {
+      service.exportRegister.mockResolvedValue({ filename: 'assets-2027-01-15.csv', content: 'a,b' });
+      const response = { setHeader: jest.fn() };
+
+      const body = await controller.exportRegister('org-1', 'ACTIVE', 'p1', 'd1', 'FAIR', 'pump', { user: { roleName: 'finance' } } as never, response as never);
+      await controller.exportRegister(undefined, undefined, undefined, undefined, undefined, undefined, { user: { roleName: 'staff' } } as never, res());
+
+      expect(body).toBe('a,b');
+      expect(response.setHeader).toHaveBeenCalledWith('Content-Type', 'text/csv; charset=utf-8');
+      expect(response.setHeader).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename="assets-2027-01-15.csv"');
+      expect(service.exportRegister).toHaveBeenNthCalledWith(
+        1,
+        { organizationId: 'org-1', status: 'ACTIVE', projectId: 'p1', departmentId: 'd1', condition: 'FAIR', search: 'pump' },
+        true,
+      );
+      expect(service.exportRegister).toHaveBeenNthCalledWith(2, expect.any(Object), false);
+    });
+
+    it('exports the valuation as a download', async () => {
+      service.exportValuation.mockResolvedValue({ filename: 'asset-valuation-2027-01-15.csv', content: 'x' });
+      const response = { setHeader: jest.fn() };
+
+      const body = await controller.exportValuation('org-1', '2027-01-15', 'true', response as never);
+
+      expect(body).toBe('x');
+      expect(service.exportValuation).toHaveBeenCalledWith({ organizationId: 'org-1', asOf: '2027-01-15', includeDecommissioned: 'true' });
+      expect(response.setHeader).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename="asset-valuation-2027-01-15.csv"');
+    });
   });
 });

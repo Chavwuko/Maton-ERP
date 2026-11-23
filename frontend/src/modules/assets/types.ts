@@ -122,6 +122,29 @@ export interface ValuationReport {
   totals: ValuationFigures & { notValued: number; byCategory: (ValuationFigures & { category: string })[] };
 }
 
+// The asset overview: counts, what needs attention, and what it is worth.
+export interface AssetDashboard {
+  asOf: string;
+  assetCount: number;
+  byStatus: { label: string; count: number }[];
+  byCondition: { label: string; count: number }[];
+  checkedOut: number;
+  overdueReturns: {
+    count: number;
+    items: {
+      id: string;
+      expectedReturn: string;
+      asset: { id: string; assetTag: string; name: string };
+      assignee: { firstName: string; lastName: string; email: string } | null;
+      department: { name: string } | null;
+    }[];
+  };
+  warrantyExpiring: { count: number; items: { id: string; assetTag: string; name: string; warrantyExpiry: string }[] };
+  maintenance: { openWorkOrders: number; overdueSchedules: number; dueSoonSchedules: number };
+  // bookValue is left out for the staff role.
+  totals: { bookValue?: string; notValued: number };
+}
+
 export const ASSET_CONDITIONS: AssetCondition[] = ['NEW', 'GOOD', 'FAIR', 'POOR'];
 
 export const ASSET_CONDITION_COLORS: Record<AssetCondition, string> = {

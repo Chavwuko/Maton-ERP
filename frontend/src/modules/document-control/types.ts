@@ -30,6 +30,7 @@ export interface AppDocument {
   departmentId: string | null;
   projectId: string | null;
   workOrderId: string | null;
+  assetId?: string | null;
   invoiceId: string | null;
   incidentId: string | null;
   employeeId: string | null;

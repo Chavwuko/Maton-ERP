@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { Alert, Anchor, Badge, Group, Loader, SimpleGrid, Stack, Switch, Table, Text, TextInput, Title } from '@mantine/core';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Alert, Anchor, Badge, Button, Group, Loader, SimpleGrid, Stack, Switch, Table, Text, TextInput, Title } from '@mantine/core';
 import { ApiError } from '../../api/client';
-import { getValuationReport } from '../../api/assets';
+import { downloadValuationExport, getValuationReport } from '../../api/assets';
+import { saveTextFile } from '../../lib/saveFile';
 import { useRole } from '../../auth/RoleContext';
 import { OrganizationSelect } from '../../components/OrganizationSelect';
 import { StatCard } from '../../components/StatCard';
@@ -34,6 +35,11 @@ export function AssetValuationPage() {
     enabled: allowed,
   });
 
+  const exportMutation = useMutation({
+    mutationFn: () => downloadValuationExport({ organizationId: organizationId ?? undefined, asOf: asOf || undefined, includeDecommissioned }),
+    onSuccess: ({ filename, text }) => saveTextFile(filename, text),
+  });
+
   if (!allowed) {
     return (
       <Alert color="yellow" title="Not available">
@@ -44,7 +50,12 @@ export function AssetValuationPage() {
 
   return (
     <Stack>
-      <Title order={2}>Asset valuation</Title>
+      <Group justify="space-between">
+        <Title order={2}>Asset valuation</Title>
+        <Button variant="light" loading={exportMutation.isPending} onClick={() => exportMutation.mutate()}>
+          Export CSV
+        </Button>
+      </Group>
 
       <Group align="flex-end">
         <OrganizationSelect clearable w={240} value={organizationId} onChange={setOrganizationId} />

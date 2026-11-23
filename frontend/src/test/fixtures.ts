@@ -1,6 +1,7 @@
 import type { Session } from '../api/auth';
 import type { Appointment } from '../modules/appointments/types';
 import type { Asset, AssetAssignment, AssetValuation } from '../modules/assets/types';
+import type { AppDocument } from '../modules/document-control/types';
 import type { MaintenanceSchedule, ServiceHistory } from '../modules/maintenance/types';
 import type { User } from '../modules/users/types';
 
@@ -165,6 +166,36 @@ export function makeValuation(overrides: Partial<AssetValuation> = {}): AssetVal
     monthsElapsed: 0,
     fullyDepreciated: false,
     schedule: [],
+    ...overrides,
+  };
+}
+
+// A file attached to an asset, with one version.
+export function makeDocument(overrides: Partial<AppDocument> = {}): AppDocument {
+  return {
+    id: 'doc-1',
+    organizationId: 'org-1',
+    departmentId: null,
+    projectId: null,
+    workOrderId: null,
+    assetId: 'asset-1',
+    invoiceId: null,
+    incidentId: null,
+    employeeId: null,
+    title: 'Manual',
+    description: null,
+    category: null,
+    status: 'DRAFT',
+    currentVersion: 1,
+    ownerId: 'user-1',
+    createdAt: '2026-10-20T09:00:00.000Z',
+    updatedAt: '2026-10-20T09:00:00.000Z',
+    versions: [
+      {
+        id: 'ver-1', documentId: 'doc-1', versionNumber: 1, fileKey: 'k', fileName: 'manual.pdf', mimeType: 'application/pdf',
+        fileSizeBytes: 2048, uploadedById: 'user-1', createdAt: '2026-10-20T09:00:00.000Z',
+      },
+    ],
     ...overrides,
   };
 }

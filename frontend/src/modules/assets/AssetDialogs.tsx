@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Group, Modal, Select, Stack, Textarea, TextInput } from '@mantine/core';
+import { Button, FileInput, Group, Modal, Select, Stack, Textarea, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { checkInAsset, checkOutAsset, updateAsset } from '../../api/assets';
 import { ApiError } from '../../api/client';
+import { createDocument } from '../../api/documentControl';
 import { DepartmentSelect } from '../../components/DepartmentSelect';
 import { UserSelect } from '../../components/UserSelect';
 import { AssetFormFields, assetToForm, formToFields, validateAssetForm, type AssetFormValues } from './AssetFormFields';
@@ -156,6 +157,50 @@ export function CheckInDialog({ asset, opened, onClose }: DialogProps) {
           <Group justify="flex-end">
             <Button type="submit" loading={mutation.isPending}>
               Check in
+            </Button>
+          </Group>
+        </Stack>
+      </form>
+    </Modal>
+  );
+}
+
+// A photo, manual or certificate for the asset.
+export function AttachmentDialog({ asset, opened, onClose }: DialogProps) {
+  const queryClient = useQueryClient();
+  const form = useForm<{ title: string; file: File | null }>({
+    initialValues: { title: '', file: null },
+    validate: {
+      title: (value) => (value.trim() ? null : 'Title is required'),
+      file: (value) => (value ? null : 'A file is required'),
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: (values: typeof form.values) =>
+      createDocument({ organizationId: asset.organizationId, assetId: asset.id, title: values.title.trim() }, values.file!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      notifications.show({ message: 'File added', color: 'green' });
+      onClose();
+    },
+    onError: errorToast('Failed to add the file'),
+  });
+
+  return (
+    <Modal opened={opened} onClose={onClose} title={`Add a file to ${asset.assetTag}`}>
+      <form noValidate onSubmit={form.onSubmit((values) => mutation.mutate(values))}>
+        <Stack>
+          <TextInput
+            label="Title"
+            placeholder="Nameplate photo"
+            required
+            {...form.getInputProps('title')}
+          />
+          <FileInput label="File" required {...form.getInputProps('file')} />
+          <Group justify="flex-end">
+            <Button type="submit" loading={mutation.isPending}>
+              Add
             </Button>
           </Group>
         </Stack>

@@ -51,6 +51,7 @@ describe('AppNav', () => {
 
     expect(screen.getByRole('link', { name: 'Valuation' })).toHaveAttribute('href', '/assets/valuation');
     expect(screen.getByRole('link', { name: 'Valuation' })).toHaveAttribute('data-active', 'true');
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/assets/dashboard');
     expect(screen.getByRole('link', { name: 'Register' })).toHaveAttribute('href', '/assets');
     expect(screen.getByRole('link', { name: 'Register' })).not.toHaveAttribute('data-active', 'true');
   });
