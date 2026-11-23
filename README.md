@@ -1315,8 +1315,17 @@ Standing list of planned work — not yet started unless noted otherwise.
   proven out on HR; every other department (Maintenance, Accounting,
   Inventory, HSE, Document Control, Project Control, Assets) still only has
   list/detail pages. On hold until the HR sub-modules above are done.
-- **Frontend theme redesign** to match brand style (colors, typography,
-  spacing — currently default Mantine theme).
+- ~~Frontend theme, logo and favicon~~ — done 2026-11-24. The layout follows two
+  reference dashboards the user chose (a dark sidebar, the work in one white
+  rounded panel on a pale page, quiet tables with a tinted header and tall rows,
+  tinted stat tiles, soft status pills, Inter). The colours come from the Maton
+  logo: its blue (`#4768a6`) is the brand colour (navy sidebar, buttons, links)
+  and its star green (`#00a75a`) is the accent (good news, the marker beside the
+  current page; Mantine's `green` is re-centred on it). It lives in
+  `src/theme.ts`, `src/index.css`, `AppShell`, `StatCard`, `PersonCell` and
+  `StarsMark`; the logo files are in `public/` (`logo.png`, `logo-mark.png`,
+  `favicon.png`, `apple-touch-icon.png`, cut from the original artwork). The
+  page title is "Maton ERP". Still open: a dark mode, if wanted.
 - **Logo and site favicon** — not yet implemented anywhere in the SPA.
 - **HR dashboard visual redesign** to match a specific sketched layout the
   user will provide (current `HRDashboardPage` layout — stat card row +

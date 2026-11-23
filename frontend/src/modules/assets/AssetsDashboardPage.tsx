@@ -51,10 +51,10 @@ export function AssetsDashboardPage() {
             {dashboard.totals.bookValue !== undefined && <StatCard label="Book value" value={formatMoney(dashboard.totals.bookValue)} />}
           </SimpleGrid>
           <SimpleGrid cols={{ base: 1, sm: 4 }}>
-            <StatCard label="Maintenance overdue" value={dashboard.maintenance.overdueSchedules} />
-            <StatCard label="Maintenance due soon" value={dashboard.maintenance.dueSoonSchedules} />
-            <StatCard label="Returns overdue" value={dashboard.overdueReturns.count} />
-            <StatCard label="Warranties ending in 60 days" value={dashboard.warrantyExpiring.count} />
+            <StatCard label="Maintenance overdue" value={dashboard.maintenance.overdueSchedules} tone={dashboard.maintenance.overdueSchedules > 0 ? 'bad' : 'good'} />
+            <StatCard label="Maintenance due soon" value={dashboard.maintenance.dueSoonSchedules} tone={dashboard.maintenance.dueSoonSchedules > 0 ? 'warn' : 'neutral'} />
+            <StatCard label="Returns overdue" value={dashboard.overdueReturns.count} tone={dashboard.overdueReturns.count > 0 ? 'bad' : 'good'} />
+            <StatCard label="Warranties ending in 60 days" value={dashboard.warrantyExpiring.count} tone={dashboard.warrantyExpiring.count > 0 ? 'warn' : 'neutral'} />
           </SimpleGrid>
           {dashboard.totals.notValued > 0 && dashboard.totals.bookValue !== undefined && (
             <Text size="sm" c="dimmed">

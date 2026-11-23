@@ -1,3 +1,213 @@
+/* The app's look beyond the Mantine theme (see theme.ts): the navy sidebar
+   against a cool page, the white working panel, and quiet tables. */
+
+:root {
+  --app-page: #f1f4f9;
+  --app-sidebar: #223257;
+  --app-line: #e3e8f0;
+  --app-soft: #f5f7fc;
+  --app-green: #00a75a;
+  --mantine-color-default-border: var(--app-line);
+}
+
 body {
   margin: 0;
+  background: var(--app-page);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- shell ----------------------------------------------------------------- */
+
+.mantine-AppShell-root,
+.mantine-AppShell-main {
+  background: var(--app-page);
+}
+
+.mantine-AppShell-header {
+  background: transparent;
+  border-bottom: none;
+}
+
+.mantine-AppShell-navbar {
+  background: var(--app-sidebar);
+  border-right: none;
+  color: #e3e9f5;
+}
+
+/* The working area is one white panel, so the dark sidebar frames it. */
+.page-panel {
+  background: #fff;
+  border-radius: 20px;
+  padding: 28px;
+  min-height: calc(100vh - 56px - 32px);
+  box-shadow: 0 1px 2px rgba(27, 38, 64, 0.05), 0 8px 30px rgba(27, 38, 64, 0.05);
+}
+
+/* --- sidebar navigation ----------------------------------------------------- */
+
+/* The logo sits on a white card at the top of the sidebar. */
+.app-logo {
+  display: block;
+  margin: 16px 14px 14px;
+  padding: 10px 12px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(10, 18, 40, 0.25);
+}
+
+.app-logo img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* The three stars and the company line at the foot of the sidebar. */
+.app-sidebar-foot {
+  padding: 14px 18px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(227, 233, 245, 0.6);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.app-sidebar-foot svg {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.app-nav .mantine-NavLink-root {
+  border-radius: 10px;
+  color: #d6def0;
+  margin-bottom: 2px;
+  position: relative;
+}
+
+/* Icons: quiet by default, star green beside the page you are on. */
+.app-nav .mantine-NavLink-section {
+  margin-inline-end: 12px;
+  color: rgba(214, 222, 240, 0.78);
+}
+
+.app-nav .mantine-NavLink-children .mantine-NavLink-section {
+  margin-inline-end: 10px;
+  color: rgba(214, 222, 240, 0.6);
+}
+
+.app-nav .mantine-NavLink-root:hover .mantine-NavLink-section {
+  color: #fff;
+}
+
+.app-nav .mantine-NavLink-root[data-active] .mantine-NavLink-section {
+  color: var(--app-green);
+}
+
+.app-nav .mantine-NavLink-label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.app-nav .mantine-NavLink-root:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.app-nav .mantine-NavLink-root[data-active] {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+/* The star-green marker beside the page you are on. */
+.app-nav .mantine-NavLink-root[data-active]::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--app-green);
+}
+
+.app-nav .mantine-NavLink-root[data-active] .mantine-NavLink-label {
+  font-weight: 600;
+}
+
+.app-nav .mantine-NavLink-root[data-disabled] {
+  opacity: 1;
+  color: rgba(227, 233, 245, 0.42);
+}
+
+.app-nav .mantine-NavLink-description {
+  color: rgba(227, 233, 245, 0.4);
+  font-size: 11px;
+}
+
+.app-nav .mantine-NavLink-chevron {
+  color: rgba(227, 233, 245, 0.7);
+}
+
+/* Children sit under their parent with a faint guide line. */
+.app-nav .mantine-NavLink-children {
+  margin-left: 14px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+/* --- tables ------------------------------------------------------------------ */
+
+/* No zebra stripes or boxes: tall rows, thin dividers, a tinted header. */
+.mantine-Table-table {
+  --table-striped-color: transparent !important;
+  --table-highlight-on-hover-color: var(--app-soft) !important;
+  --table-border-color: var(--app-line);
+}
+
+.mantine-Table-th {
+  background: var(--app-soft);
+  color: #5d6b85;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-bottom: none;
+}
+
+.mantine-Table-th:first-of-type {
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px;
+}
+
+.mantine-Table-th:last-of-type {
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+.mantine-Table-td {
+  font-size: 14px;
+}
+
+/* --- cards and inputs ---------------------------------------------------------- */
+
+.mantine-Paper-root[data-with-border] {
+  border-color: var(--app-line);
+  box-shadow: 0 1px 2px rgba(27, 38, 64, 0.04);
+}
+
+.mantine-Input-input,
+.mantine-InputBase-input {
+  background: #fff;
+}
+
+.mantine-Tabs-tab {
+  font-weight: 600;
+}
+
+/* Status pills show their whole text, even in a narrow column. */
+.mantine-Badge-root {
+  max-width: none;
+  overflow: visible;
+}
+
+.mantine-Badge-label {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
 }

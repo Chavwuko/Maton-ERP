@@ -4,6 +4,7 @@ import { Alert, Badge, Group, Loader, Select, Stack, Table, Text } from '@mantin
 import { ApiError } from '../../api/client';
 import { listAllLeave } from '../../api/leave';
 import { DepartmentSelect } from '../../components/DepartmentSelect';
+import { PersonCell } from '../../components/PersonCell';
 import { LeaveProgress } from './LeaveProgress';
 import { LEAVE_STATUS_COLORS, LEAVE_STATUS_LABELS, leaveDate, personName, type LeaveStatus } from './types';
 
@@ -49,10 +50,7 @@ export function AllLeavePanel() {
             {data.map((request) => (
               <Table.Tr key={request.id}>
                 <Table.Td>
-                  <Text fw={500}>{personName(request.employee.user)}</Text>
-                  <Text size="xs" c="dimmed">
-                    {request.employee.user.department?.name ?? '—'}
-                  </Text>
+                  <PersonCell name={personName(request.employee.user)} detail={request.employee.user.department?.name ?? '—'} />
                 </Table.Td>
                 <Table.Td>
                   <Text>{request.leaveType.name}</Text>

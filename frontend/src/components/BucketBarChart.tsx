@@ -6,7 +6,7 @@ export function BucketBarChart({
   title,
   data,
   seriesName = 'Employees',
-  color = 'blue.6',
+  color = 'brand.6',
 }: {
   title: string;
   data: DashboardBucket[];

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Badge, Button, Loader, Stack, Table, Text } from '@mantine/core';
 import { ApiError } from '../../api/client';
+import { PersonCell } from '../../components/PersonCell';
 import { listLeaveInbox } from '../../api/leave';
 import { DecisionDialog } from './DecisionDialog';
 import { LEAVE_STATUS_COLORS, LEAVE_STATUS_LABELS, leaveDate, personName, type LeaveRequest } from './types';
@@ -35,10 +36,10 @@ export function ApprovalsPanel() {
             {data.map((request) => (
               <Table.Tr key={request.id}>
                 <Table.Td>
-                  <Text fw={500}>{personName(request.employee.user)}</Text>
-                  <Text size="xs" c="dimmed">
-                    {[request.employee.jobTitle, request.employee.user.department?.name].filter(Boolean).join(', ')}
-                  </Text>
+                  <PersonCell
+                    name={personName(request.employee.user)}
+                    detail={[request.employee.jobTitle, request.employee.user.department?.name].filter(Boolean).join(', ')}
+                  />
                 </Table.Td>
                 <Table.Td>
                   <Text>{request.leaveType.name}</Text>

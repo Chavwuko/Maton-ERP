@@ -4,6 +4,7 @@ import { Alert, Badge, Group, Loader, SimpleGrid, Stack, Table, Text, TextInput,
 import { ApiError } from '../../api/client';
 import { getOnLeave } from '../../api/leave';
 import { DepartmentSelect } from '../../components/DepartmentSelect';
+import { PersonCell } from '../../components/PersonCell';
 import { StatCard } from '../../components/StatCard';
 import { daysBetween, leaveDate, personName, type LeaveRequest } from './types';
 
@@ -26,10 +27,7 @@ function PeopleTable({ requests, empty, asOf, showBack }: { requests: LeaveReque
           return (
             <Table.Tr key={request.id}>
               <Table.Td>
-                <Text fw={500}>{personName(request.employee.user)}</Text>
-                <Text size="xs" c="dimmed">
-                  {request.employee.jobTitle}
-                </Text>
+                <PersonCell name={personName(request.employee.user)} detail={request.employee.jobTitle} />
               </Table.Td>
               <Table.Td>{request.employee.user.department?.name ?? '—'}</Table.Td>
               <Table.Td>{request.leaveType.name}</Table.Td>
@@ -85,10 +83,10 @@ export function OnLeavePanel() {
       {data && (
         <>
           <SimpleGrid cols={{ base: 2, sm: 4 }}>
-            <StatCard label="On leave" value={data.counts.onLeave} />
-            <StatCard label="Back within a week" value={data.counts.returningThisWeek} />
+            <StatCard label="On leave" value={data.counts.onLeave} tone={data.counts.onLeave > 0 ? 'warn' : 'good'} />
+            <StatCard label="Back within a week" value={data.counts.returningThisWeek} tone="good" />
             <StatCard label="Starting in 30 days" value={data.counts.startingSoon} />
-            <StatCard label="Awaiting approval" value={data.counts.awaitingApproval} />
+            <StatCard label="Awaiting approval" value={data.counts.awaitingApproval} tone={data.counts.awaitingApproval > 0 ? 'bad' : 'neutral'} />
           </SimpleGrid>
 
           <Title order={4}>On leave on {leaveDate(data.asOf)}</Title>

@@ -49,7 +49,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return (
       <Center h="100vh">
         <Stack align="center" gap="xs">
-          <Title order={2}>ERP Foundations</Title>
+          <img src="/logo.png" alt="Maton Engineering Nig. Ltd." width={320} style={{ maxWidth: '80vw', height: 'auto' }} />
+          <Title order={2}>Maton ERP</Title>
           <Text c="dimmed">Sign in with your organization account to continue.</Text>
           {exitPreview ? (
             <Button onClick={exitPreview}>Exit sign-up preview</Button>

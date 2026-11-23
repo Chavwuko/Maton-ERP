@@ -5,16 +5,16 @@ import type { DashboardBucket } from '../modules/hr/types';
 // Cycled by index rather than keyed by label, so it stays stable regardless
 // of which enum/free-text values a given breakdown happens to contain.
 const COLORS = [
-  'blue.6',
-  'grape.6',
-  'teal.6',
-  'orange.6',
-  'red.6',
-  'indigo.6',
-  'lime.7',
-  'pink.6',
-  'cyan.6',
+  'brand.6',
+  'green.6',
   'yellow.7',
+  'grape.6',
+  'red.6',
+  'cyan.6',
+  'indigo.6',
+  'orange.6',
+  'pink.6',
+  'lime.7',
 ];
 
 export function BucketPieChart({

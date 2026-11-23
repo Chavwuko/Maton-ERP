@@ -70,4 +70,14 @@ describe('AppNav', () => {
     expect(screen.getByRole('link', { name: 'Work orders' })).toHaveAttribute('href', '/maintenance');
     expect(screen.getByRole('link', { name: 'Work orders' })).not.toHaveAttribute('data-active', 'true');
   });
+
+  it('puts an icon before every module and page, including the one that is not built yet', () => {
+    renderWithProviders(<AppNav />, { route: '/hr' });
+
+    const links = screen.getAllByRole('link');
+    expect(links.length).toBeGreaterThan(10);
+    links.forEach((link) => expect(link.querySelector('svg'), link.textContent ?? '').not.toBeNull());
+    // The disabled Performance entry has one too.
+    expect(screen.getByText('Performance').closest('.mantine-NavLink-root')!.querySelector('svg')).not.toBeNull();
+  });
 });
