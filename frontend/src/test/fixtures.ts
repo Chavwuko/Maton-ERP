@@ -2,6 +2,7 @@ import type { Session } from '../api/auth';
 import type { Appointment } from '../modules/appointments/types';
 import type { Asset, AssetAssignment, AssetValuation } from '../modules/assets/types';
 import type { AppDocument } from '../modules/document-control/types';
+import type { LeaveAccess, LeaveRequest, LeaveType } from '../modules/leave/types';
 import type { MaintenanceSchedule, ServiceHistory } from '../modules/maintenance/types';
 import type { User } from '../modules/users/types';
 
@@ -196,6 +197,48 @@ export function makeDocument(overrides: Partial<AppDocument> = {}): AppDocument 
         fileSizeBytes: 2048, uploadedById: 'user-1', createdAt: '2026-10-20T09:00:00.000Z',
       },
     ],
+    ...overrides,
+  };
+}
+
+export function makeLeaveType(overrides: Partial<LeaveType> = {}): LeaveType {
+  return { id: 'lt-1', organizationId: 'org-1', name: 'Annual leave', daysPerYear: 21, paid: true, allowBackdate: false, active: true, ...overrides };
+}
+
+export function makeLeaveAccess(overrides: Partial<LeaveAccess> = {}): LeaveAccess {
+  return {
+    employeeId: 'emp-1',
+    organizationId: 'org-1',
+    isDepartmentHead: false,
+    isSupervisor: false,
+    canViewDashboard: false,
+    canViewAll: false,
+    canManageTypes: false,
+    awaitingMyDecision: 0,
+    ...overrides,
+  };
+}
+
+// A leave request for Eve Worker in Plant, from Tuesday 1 to Thursday 3 December 2026.
+export function makeLeaveRequest(overrides: Partial<LeaveRequest> = {}): LeaveRequest {
+  return {
+    id: 'lr-1',
+    employeeId: 'emp-1',
+    status: 'PENDING_SUPERVISOR',
+    startDate: '2026-12-01T00:00:00.000Z',
+    endDate: '2026-12-03T00:00:00.000Z',
+    returnDate: '2026-12-04T00:00:00.000Z',
+    days: 3,
+    reason: null,
+    createdAt: '2026-11-24T09:00:00.000Z',
+    leaveType: { id: 'lt-1', name: 'Annual leave', paid: true },
+    employee: {
+      id: 'emp-1',
+      employeeNumber: 'E-1',
+      jobTitle: 'Operator',
+      user: { id: 'u-eve', firstName: 'Eve', lastName: 'Worker', email: 'eve@acme.test', department: { id: 'dept-1', name: 'Plant' } },
+    },
+    approvals: [],
     ...overrides,
   };
 }

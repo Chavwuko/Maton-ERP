@@ -4,17 +4,16 @@ import { renderWithProviders } from '../test/renderWithProviders';
 import { AppNav } from './AppNav';
 
 describe('AppNav', () => {
-  it('expands the HR item into Dashboard, Employees, Shift & Attendance, Expense Requests, and disabled sub-module placeholders', () => {
+  it('expands the HR item into Dashboard, Employees, Shift & Attendance, Expense Requests, Leaves, and a disabled Performance placeholder', () => {
     renderWithProviders(<AppNav />, { route: '/hr' });
 
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/hr');
     expect(screen.getByRole('link', { name: 'Employees' })).toHaveAttribute('href', '/hr/employees');
     expect(screen.getByRole('link', { name: 'Shift & Attendance' })).toHaveAttribute('href', '/hr/shift-attendance');
     expect(screen.getByRole('link', { name: 'Expense Requests' })).toHaveAttribute('href', '/hr/expense-requests');
-    for (const label of ['Performance', 'Leaves']) {
-      expect(screen.getByText(label)).toBeInTheDocument();
-    }
-    expect(screen.getAllByText('Coming soon')).toHaveLength(2);
+    expect(screen.getByRole('link', { name: 'Leaves' })).toHaveAttribute('href', '/hr/leaves');
+    expect(screen.getByText('Performance')).toBeInTheDocument();
+    expect(screen.getAllByText('Coming soon')).toHaveLength(1);
   });
 
   it('does not confuse the HR Dashboard link with the Employees link when on /hr/employees', () => {

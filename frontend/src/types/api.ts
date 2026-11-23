@@ -3,6 +3,8 @@ export interface Department {
   organizationId: string;
   name: string;
   code: string;
+  headId?: string | null;
+  head?: { id: string; firstName: string; lastName: string; email: string } | null;
   createdAt: string;
 }
 

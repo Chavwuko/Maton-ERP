@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateDepartmentDto } from './dto/create-department.dto';
@@ -12,11 +12,15 @@ export class DepartmentsService {
     return this.prisma.department.findMany({
       where: { organizationId: filters.organizationId },
       orderBy: { code: 'asc' },
+      include: { head: { select: { id: true, firstName: true, lastName: true, email: true } } },
     });
   }
 
   async findOne(id: string) {
-    const department = await this.prisma.department.findUnique({ where: { id } });
+    const department = await this.prisma.department.findUnique({
+      where: { id },
+      include: { head: { select: { id: true, firstName: true, lastName: true, email: true } } },
+    });
     if (!department) {
       throw new NotFoundException(`Department ${id} not found`);
     }
@@ -35,6 +39,11 @@ export class DepartmentsService {
   }
 
   async update(id: string, dto: UpdateDepartmentDto) {
+    if (dto.headId) {
+      const head = await this.prisma.user.findUnique({ where: { id: dto.headId } });
+      if (!head) throw new NotFoundException(`User ${dto.headId} not found`);
+      if (head.status !== 'ACTIVE') throw new BadRequestException('A department head needs an active account');
+    }
     try {
       return await this.prisma.department.update({ where: { id }, data: dto });
     } catch (err) {

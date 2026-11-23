@@ -59,6 +59,13 @@ export const ACTIVITY_LABELS: Record<string, ActivityLabel> = {
   'DELETE /maintenance-schedules/:id': { action: 'MAINTENANCE_SCHEDULE_DELETE', entityType: 'MaintenanceSchedule', summary: ({ res }) => res.title },
   'POST /maintenance-schedules/generate': { action: 'MAINTENANCE_GENERATE', entityType: 'MaintenanceSchedule', summary: ({ res }) => `${res.created} work order(s) opened` },
 
+  'POST /leave/requests': { action: 'LEAVE_REQUESTED', entityType: 'LeaveRequest', summary: ({ res }) => `${res.leaveType?.name}, ${res.days} day(s) from ${String(res.startDate).slice(0, 10)}` },
+  'POST /leave/requests/:id/decision': { action: 'LEAVE_DECIDED', entityType: 'LeaveRequest', summary: ({ res, body }) => `${body.decision === 'REJECT' ? 'declined' : 'approved'}, now ${res.status}` },
+  'POST /leave/requests/:id/cancel': { action: 'LEAVE_CANCELLED', entityType: 'LeaveRequest', summary: ({ res }) => `${res.leaveType?.name} from ${String(res.startDate).slice(0, 10)}` },
+  'POST /leave/types': { action: 'LEAVE_TYPE_CREATE', entityType: 'LeaveType', summary: ({ res }) => res.name },
+  'POST /leave/types/defaults': { action: 'LEAVE_TYPES_DEFAULTED', entityType: 'LeaveType', summary: ({ res }) => `${res.length} leave types` },
+  'PATCH /leave/types/:id': { action: 'LEAVE_TYPE_UPDATE', entityType: 'LeaveType', summary: ({ res }) => res.name },
+
   'POST /appointments': { action: 'APPOINTMENT_BOOKED', entityType: 'Appointment', summary: ({ res }) => `${res.subject} on ${String(res.date).slice(0, 10)} at ${res.time}` },
   'POST /appointments/:id/cancel': { action: 'APPOINTMENT_CANCELLED', entityType: 'Appointment', summary: ({ res }) => res.subject },
   'POST /appointments/:id/review': {

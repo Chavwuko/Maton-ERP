@@ -802,6 +802,64 @@ HSE's corrective actions). Receipts attach via the ordinary `POST
   are terminal. `decidedAt`/`decidedById` are stamped on the
   approve/reject decision, not on the later reimbursement.
 
+### Leave
+
+Employees file leave; each request goes through three steps in order: the
+**supervisor or department head**, then **HR**, then the **executive director**.
+Anyone declining at any step ends it (a reason is required). Approved leave is
+what the "who is on leave" dashboard shows, with each person's expected return.
+
+- **Who decides what.** Step 1: the employee's supervisor (`Employee.managerId`)
+  or the head of their department (`Department.headId`, set by an admin on the
+  organization page or `PATCH /departments/:id` with `headId`). If neither exists
+  (or the person heads the department themselves) the step is skipped and the
+  request goes straight to HR. Step 2: the `hr` role. Step 3: the new
+  `executive_director` role. `admin` can act at any step. **Nobody can decide
+  their own request**, not even admin; if the executive director files leave, an
+  admin has to confirm it.
+- **Filing** (`POST /leave/requests`: `leaveTypeId`, `startDate`, `endDate`,
+  `reason?`) needs an employee record. It is refused if it overlaps leave that is
+  pending or approved, has no working days in it, starts in the past (except for
+  types that allow filing after the fact, such as sick leave), or would use more
+  than the year's allowance left. Weekends follow the store's working days
+  (Appointments schedule setting); public holidays are not modelled, so a
+  holiday in the middle still counts as a working day. `days` is the working days
+  in the range; `returnDate` is the next working day after the last day. A
+  request counts against the calendar year it starts in.
+- **Leave types** (`GET/POST /leave/types`, `PATCH /leave/types/:id`,
+  `POST /leave/types/defaults`): HR/admin maintain them: name, working days a
+  year (empty = no limit), paid or not, and whether it may be filed after it has
+  started. "Add standard types" creates Annual (21), Sick (10, may be backdated),
+  Maternity (90), Paternity (10), Compassionate (5, may be backdated), Study (10)
+  and Unpaid (no limit); every figure is editable. These numbers are a starting
+  point, not company policy.
+- **Statuses**: `PENDING_SUPERVISOR` -> `PENDING_HR` -> `PENDING_DIRECTOR` ->
+  `APPROVED`, or `REJECTED` / `CANCELLED`. Each decision is a `LeaveApproval` row
+  (stage, decision, who, comment). `POST /leave/requests/:id/decision`
+  (`decision: APPROVE | REJECT`, `comment`) and `POST .../cancel`: the requester
+  can cancel while it is pending or before approved leave starts; HR/admin can
+  cancel any time.
+- **Reading**: `GET /leave/access` (what the signed-in person can see and do),
+  `GET /leave/requests/mine`, `GET /leave/requests/inbox` (waiting on them),
+  `GET /leave/requests` (HR, executive director, admin: everything; a
+  department head or supervisor: their people's), `GET /leave/requests/:id`,
+  `GET /leave/balance` (allowance, taken, waiting and left per type).
+- **Dashboard**: `GET /leave/on-leave?date?&departmentId?` — who is away on a
+  day (today by default) with their return date, who starts in the next 30 days,
+  and counts. Visible to the executive director, HR and admin (everyone), and to
+  department heads and supervisors (their own people); everyone else gets 403.
+- **Email**: whoever must decide next is emailed when a request reaches them
+  (supervisor and head, then HR, then the director); the requester is emailed when
+  it is finally approved or declined.
+- Employee `ON_LEAVE` status is **not** changed by approved leave: the dashboard
+  works from the approved requests themselves.
+
+**Frontend**: HR > Leaves (`/hr/leaves`) has **My leave** (allowances, requests,
+progress through the three steps, Request leave, cancel), **Approvals** (what is
+waiting for you, with a review dialog), **Who is on leave** (the dashboard),
+**All requests** and, for HR/admin, **Leave types**. Which tabs show comes from
+`GET /leave/access`.
+
 ## Users, sign-up and approval
 
 People sign themselves up, then wait for an admin. Cognito's Hosted UI
@@ -977,9 +1035,8 @@ just a new page composing them against its own aggregate endpoint, not new
 chart-wiring code. Charts are `@mantine/charts` (a thin Recharts wrapper
 that inherits the Mantine theme for free). `AppNav` supports nested
 children for exactly this shape — HR's entry expands into Dashboard,
-Employees, and four disabled "Coming soon" placeholders (Shift &
-Attendance, Expense Requests, Performance, Leaves) for sub-modules not
-built yet.
+Employees, Shift & Attendance, Expense Requests and Leaves, plus a disabled
+"Coming soon" placeholder for Performance, which is not built yet.
 
 **Auth**: `src/auth/authMode.ts` mirrors the backend's `AUTH_MODE` switch via
 `VITE_AUTH_MODE` (default `local`, matching `AUTH_MODE=local`). `local` keeps
@@ -1248,10 +1305,11 @@ exchange round-trip against Cognito itself has not been exercised live.
 
 Standing list of planned work — not yet started unless noted otherwise.
 
-- **HR sub-modules**: Shift & Attendance and Expense Requests are now built
-  (see their sections under the HR module section above). Performance,
-  Leaves remain placeholder "Coming soon" entries in `AppNav` (nested under
-  HR) — on hold until the workflow for each is provided.
+- **HR sub-modules**: Shift & Attendance, Expense Requests and Leaves are now
+  built (see their sections under the HR module section above). Performance
+  remains a placeholder "Coming soon" entry in `AppNav` (nested under HR) — on
+  hold until its workflow is provided. For Leaves, still to do: public holidays,
+  half days, carry-over of unused allowance, and a leave calendar view.
 - **Department dashboards beyond HR**: the `StatCard`/`BucketPieChart`/
   `BucketBarChart` pattern (see "Department dashboards" under Frontend) is
   proven out on HR; every other department (Maintenance, Accounting,

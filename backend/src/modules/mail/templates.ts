@@ -106,6 +106,41 @@ Due: ${day(workOrder.dueDate)}`,
   };
 }
 
+export interface LeaveMail {
+  employeeName: string;
+  employeeEmail: string;
+  leaveType: string;
+  startDate: Date;
+  endDate: Date;
+  returnDate: Date;
+  days: number;
+}
+
+const leaveSummary = (leave: LeaveMail) =>
+  `${leave.days} working day${leave.days === 1 ? '' : 's'} of ${leave.leaveType.toLowerCase()} from ${day(leave.startDate)} to ${day(leave.endDate)}, back on ${day(leave.returnDate)}`;
+
+// To whoever has to decide the next step of a leave request.
+export function leaveAwaiting(leave: LeaveMail): Email {
+  return {
+    subject: `Leave request awaiting your decision — ${leave.employeeName}`,
+    body: `${leave.employeeName} has asked for ${leaveSummary(leave)}. Open Leaves to approve or decline it.`,
+  };
+}
+
+// To the requester when the last step approves it, or any step declines it.
+export function leaveDecided(leave: LeaveMail, outcome: { approved: boolean; stage: string; comment: string | null }): Email {
+  if (outcome.approved) {
+    return {
+      subject: 'Your leave has been approved',
+      body: `Hello ${leave.employeeName},\n\nYour leave has been approved: ${leaveSummary(leave)}.${outcome.comment ? `\n\nComment: ${outcome.comment}` : ''}`,
+    };
+  }
+  return {
+    subject: 'Your leave request was not approved',
+    body: `Hello ${leave.employeeName},\n\nYour request for ${leaveSummary(leave)} was declined at the ${outcome.stage} step.${outcome.comment ? `\n\nReason: ${outcome.comment}` : ''}`,
+  };
+}
+
 export function waitingReminder(
   requests: { name: string; email: string }[],
   bookings: { subject: string; requester: string; date: Date; time: string }[],

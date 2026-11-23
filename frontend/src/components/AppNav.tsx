@@ -62,7 +62,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Shift & Attendance', path: '/hr/shift-attendance' },
       { label: 'Expense Requests', path: '/hr/expense-requests' },
       { label: 'Performance' },
-      { label: 'Leaves' },
+      { label: 'Leaves', path: '/hr/leaves' },
     ],
   },
   { label: 'Users', path: '/users' },

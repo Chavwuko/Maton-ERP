@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createMockPrisma, MockPrisma } from '../../../test/utils/mock-prisma';
 import { DepartmentsService } from './departments.service';
@@ -106,6 +106,27 @@ describe('DepartmentsService', () => {
         data: { name: 'Finance & Treasury' },
       });
       expect(result).toEqual(updated);
+    });
+
+    it('names an active user as the department head, or clears the head', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'u-head', status: 'ACTIVE' } as never);
+      prisma.department.update.mockResolvedValue(department as never);
+
+      await service.update('dept-1', { headId: 'u-head' });
+      await service.update('dept-1', { headId: null });
+
+      expect(prisma.department.update).toHaveBeenNthCalledWith(1, { where: { id: 'dept-1' }, data: { headId: 'u-head' } });
+      expect(prisma.department.update).toHaveBeenNthCalledWith(2, { where: { id: 'dept-1' }, data: { headId: null } });
+      expect(prisma.user.findUnique).toHaveBeenCalledTimes(1);
+    });
+
+    it('will not make an unknown user, or one without an active account, the head', async () => {
+      prisma.user.findUnique.mockResolvedValueOnce(null);
+      await expect(service.update('dept-1', { headId: 'nope' })).rejects.toThrow(NotFoundException);
+
+      prisma.user.findUnique.mockResolvedValueOnce({ id: 'u1', status: 'PENDING' } as never);
+      await expect(service.update('dept-1', { headId: 'u1' })).rejects.toThrow(BadRequestException);
+      expect(prisma.department.update).not.toHaveBeenCalled();
     });
   });
 });

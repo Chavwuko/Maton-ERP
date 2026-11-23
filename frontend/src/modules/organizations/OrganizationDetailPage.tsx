@@ -7,6 +7,7 @@ import { notifications } from '@mantine/notifications';
 import { ApiError } from '../../api/client';
 import { createDepartment, getOrganization, updateDepartment } from '../../api/organizations';
 import { useRole } from '../../auth/RoleContext';
+import { UserSelect } from '../../components/UserSelect';
 import type { Department } from '../../types/api';
 
 export function OrganizationDetailPage() {
@@ -35,7 +36,7 @@ export function OrganizationDetailPage() {
     },
   });
 
-  const editForm = useForm({ initialValues: { code: '', name: '' } });
+  const editForm = useForm({ initialValues: { code: '', name: '', headId: '' } });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['organizations', id] });
 
@@ -56,7 +57,7 @@ export function OrganizationDetailPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (values: { code: string; name: string }) => updateDepartment(editing!.id, values),
+    mutationFn: (values: { code: string; name: string; headId: string }) => updateDepartment(editing!.id, { code: values.code, name: values.name, headId: values.headId || null }),
     onSuccess: () => {
       invalidate();
       notifications.show({ message: 'Department updated', color: 'green' });
@@ -99,6 +100,7 @@ export function OrganizationDetailPage() {
           <Table.Tr>
             <Table.Th>Code</Table.Th>
             <Table.Th>Name</Table.Th>
+            <Table.Th>Head</Table.Th>
             <Table.Th />
           </Table.Tr>
         </Table.Thead>
@@ -109,6 +111,7 @@ export function OrganizationDetailPage() {
                 <Badge variant="light">{dept.code}</Badge>
               </Table.Td>
               <Table.Td>{dept.name}</Table.Td>
+              <Table.Td>{dept.head ? `${dept.head.firstName} ${dept.head.lastName}`.trim() || dept.head.email : '—'}</Table.Td>
               <Table.Td>
                 {role === 'admin' && (
                   <Button
@@ -116,10 +119,10 @@ export function OrganizationDetailPage() {
                     size="xs"
                     onClick={() => {
                       setEditing(dept);
-                      editForm.setValues({ code: dept.code, name: dept.name });
+                      editForm.setValues({ code: dept.code, name: dept.name, headId: dept.headId ?? '' });
                     }}
                   >
-                    Rename
+                    Edit
                   </Button>
                 )}
               </Table.Td>
@@ -127,7 +130,7 @@ export function OrganizationDetailPage() {
           ))}
           {(org.departments ?? []).length === 0 && (
             <Table.Tr>
-              <Table.Td colSpan={3}>No departments yet.</Table.Td>
+              <Table.Td colSpan={4}>No departments yet.</Table.Td>
             </Table.Tr>
           )}
         </Table.Tbody>
@@ -147,11 +150,12 @@ export function OrganizationDetailPage() {
         </form>
       </Modal>
 
-      <Modal opened={!!editing} onClose={() => setEditing(null)} title="Rename department">
+      <Modal opened={!!editing} onClose={() => setEditing(null)} title="Edit department">
         <form noValidate onSubmit={editForm.onSubmit((values) => updateMutation.mutate(values))}>
           <Stack>
             <TextInput label="Code" required {...editForm.getInputProps('code')} />
             <TextInput label="Name" required {...editForm.getInputProps('name')} />
+            <UserSelect label="Department head" description="Approves the first step of their department's leave" clearable {...editForm.getInputProps('headId')} />
             <Group justify="flex-end">
               <Button type="submit" loading={updateMutation.isPending}>
                 Save

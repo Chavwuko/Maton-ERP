@@ -17,7 +17,7 @@ export function createDepartment(data: { organizationId: string; code: string; n
   return apiClient.post<Department>('/departments', data);
 }
 
-export function updateDepartment(id: string, data: { name?: string; code?: string }) {
+export function updateDepartment(id: string, data: { name?: string; code?: string; headId?: string | null }) {
   return apiClient.patch<Department>(`/departments/${id}`, data);
 }
 

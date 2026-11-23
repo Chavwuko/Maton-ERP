@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { MailService } from './mail.service';
 import * as templates from './templates';
-import type { BookingMail, Person } from './templates';
+import type { BookingMail, LeaveMail, Person } from './templates';
 
 type Booking = BookingMail & { id: string };
 
@@ -76,6 +76,25 @@ export class EmailNotifier {
       const email = templates.scheduledWorkOrder(workOrder);
       const to = workOrder.assignee ? [workOrder.assignee.email] : await this.emailsOf(['maintenance']);
       await this.mail.send(to, email.subject, email.body + this.mail.link('/maintenance', 'Open work orders'));
+    });
+  }
+
+  // Whoever decides the next step hears about a leave request: the supervisor
+  // and department head for the first step, HR for the second, the executive
+  // director for the last.
+  leaveAwaiting(leave: LeaveMail, stage: 'SUPERVISOR' | 'HR' | 'DIRECTOR', supervisorEmails: string[]) {
+    return this.safely('leaveAwaiting', async () => {
+      const email = templates.leaveAwaiting(leave);
+      const to = stage === 'SUPERVISOR' ? supervisorEmails : await this.emailsOf([stage === 'HR' ? 'hr' : 'executive_director']);
+      await this.mail.send(to, email.subject, email.body + this.mail.link('/hr/leaves?tab=approvals', 'Open leave requests'));
+    });
+  }
+
+  // The requester hears when the request is finally approved or declined.
+  leaveDecided(leave: LeaveMail, outcome: { approved: boolean; stage: string; comment: string | null }) {
+    return this.safely('leaveDecided', async () => {
+      const email = templates.leaveDecided(leave, outcome);
+      await this.mail.send([leave.employeeEmail], email.subject, email.body + this.mail.link('/hr/leaves', 'Open your leave'));
     });
   }
 

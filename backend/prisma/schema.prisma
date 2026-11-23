@@ -36,6 +36,8 @@ model Organization {
   appraisals           Appraisal[]
   shifts               Shift[]
   expenseRequests      ExpenseRequest[]
+  leaveTypes           LeaveType[]
+  leaveRequests        LeaveRequest[]
   itemCategories       ItemCategory[]
   purchases            Purchase[]
   consumptions         Consumption[]
@@ -48,9 +50,12 @@ model Department {
   organizationId String
   name           String
   code           String // short code, e.g. "MAINT", "HSE", "FIN"
+  // The department head approves the first step of its staff's leave.
+  headId         String?
   createdAt      DateTime @default(now())
 
   organization     Organization      @relation(fields: [organizationId], references: [id])
+  head             User?             @relation("DepartmentHead", fields: [headId], references: [id])
   users            User[]
   documents        Document[]
   consumptions     Consumption[]
@@ -108,6 +113,9 @@ model User {
   reviewedBy    User?       @relation("UserReviewedBy", fields: [reviewedById], references: [id])
   reviewedUsers User[]      @relation("UserReviewedBy")
   auditLogs     AuditLog[]
+
+  departmentsHeaded Department[]    @relation("DepartmentHead")
+  leaveDecisions    LeaveApproval[]
 
   documentsOwned    Document[]         @relation("DocumentOwner")
   documentVersions  DocumentVersion[]  @relation("DocumentVersionUploader")
@@ -1045,6 +1053,7 @@ model Employee {
   appraisalReviews    AppraisalReviewer[] @relation("AppraisalReviewerEmployee")
   attendanceRecords   AttendanceRecord[]
   expenseRequests     ExpenseRequest[]
+  leaveRequests       LeaveRequest[]
 
   @@unique([organizationId, employeeNumber])
   @@map("employees")
@@ -1265,4 +1274,94 @@ model ExpenseRequest {
   documents    Document[]
 
   @@map("expense_requests")
+}
+
+// ---------------------------------------------------------------------------
+// Leave: an employee files a request, which moves through the supervisor or
+// department head, then HR, then the Executive Director. Anyone refusing at any
+// step ends it. Approved leave is what the "who is on leave" dashboard shows.
+// ---------------------------------------------------------------------------
+
+model LeaveType {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  // Working days a year; empty means no limit (e.g. unpaid leave).
+  daysPerYear    Int?
+  paid           Boolean  @default(true)
+  // Sick and compassionate leave is often filed after it has started.
+  allowBackdate  Boolean  @default(false)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  requests     LeaveRequest[]
+
+  @@unique([organizationId, name])
+  @@map("leave_types")
+}
+
+enum LeaveStatus {
+  PENDING_SUPERVISOR
+  PENDING_HR
+  PENDING_DIRECTOR
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum LeaveStage {
+  SUPERVISOR
+  HR
+  DIRECTOR
+}
+
+enum LeaveDecision {
+  APPROVED
+  REJECTED
+}
+
+model LeaveRequest {
+  id             String      @id @default(uuid())
+  organizationId String
+  employeeId     String
+  leaveTypeId    String
+  // Calendar days: the first and last day away, and the day expected back.
+  startDate      DateTime    @db.Date
+  endDate        DateTime    @db.Date
+  returnDate     DateTime    @db.Date
+  // Working days within the leave.
+  days           Int
+  reason         String?
+  status         LeaveStatus
+  cancelledAt    DateTime?
+  cancelledById  String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  employee     Employee        @relation(fields: [employeeId], references: [id])
+  leaveType    LeaveType       @relation(fields: [leaveTypeId], references: [id])
+  approvals    LeaveApproval[]
+
+  @@index([employeeId, startDate])
+  @@index([status])
+  @@index([startDate, endDate])
+  @@map("leave_requests")
+}
+
+model LeaveApproval {
+  id        String        @id @default(uuid())
+  requestId String
+  stage     LeaveStage
+  decision  LeaveDecision
+  deciderId String
+  comment   String?
+  decidedAt DateTime      @default(now())
+
+  request LeaveRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  decider User         @relation(fields: [deciderId], references: [id])
+
+  @@unique([requestId, stage])
+  @@map("leave_approvals")
 }

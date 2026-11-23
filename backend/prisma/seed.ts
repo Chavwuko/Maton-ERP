@@ -8,6 +8,7 @@ const ROLES = [
   { name: 'admin', description: 'Full system access' },
   { name: 'finance', description: 'Accounting & invoicing module' },
   { name: 'hr', description: 'HR & payroll module' },
+  { name: 'executive_director', description: 'Final approval of leave; sees who is on leave' },
   { name: 'maintenance', description: 'Heavy-duty maintenance / CMMS module' },
   { name: 'hse', description: 'HSE reporting & tracking module' },
   { name: 'project_control', description: 'Project control & tracking module' },

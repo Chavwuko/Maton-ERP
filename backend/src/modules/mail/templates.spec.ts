@@ -5,6 +5,9 @@ import {
   bookingCancelledByRequester,
   bookingCreated,
   bookingDecided,
+  leaveAwaiting,
+  leaveDecided,
+  type LeaveMail,
   personName,
   scheduledWorkOrder,
   TERM,
@@ -109,6 +112,45 @@ describe('email templates', () => {
         subject: 'Preventive maintenance due — Grease bearings (PUMP-1)',
         body: 'A preventive work order has been opened for PUMP-1 Pump:\n\nGrease bearings\nDue: 2026-11-01',
       });
+    });
+  });
+
+  describe('leave', () => {
+    const leave = (overrides: Partial<LeaveMail> = {}): LeaveMail => ({
+      employeeName: 'Eve Worker',
+      employeeEmail: 'eve@acme.com',
+      leaveType: 'Annual leave',
+      startDate: new Date('2026-12-01'),
+      endDate: new Date('2026-12-03'),
+      returnDate: new Date('2026-12-04'),
+      days: 3,
+      ...overrides,
+    });
+
+    it('asks whoever decides next, saying who, what and when', () => {
+      expect(leaveAwaiting(leave())).toEqual({
+        subject: 'Leave request awaiting your decision — Eve Worker',
+        body: 'Eve Worker has asked for 3 working days of annual leave from 2026-12-01 to 2026-12-03, back on 2026-12-04. Open Leaves to approve or decline it.',
+      });
+      expect(leaveAwaiting(leave({ days: 1 })).body).toContain('1 working day of');
+    });
+
+    it('tells the requester it is approved, with any comment', () => {
+      expect(leaveDecided(leave(), { approved: true, stage: 'executive director', comment: null })).toEqual({
+        subject: 'Your leave has been approved',
+        body: 'Hello Eve Worker,\n\nYour leave has been approved: 3 working days of annual leave from 2026-12-01 to 2026-12-03, back on 2026-12-04.',
+      });
+      expect(leaveDecided(leave(), { approved: true, stage: 'executive director', comment: 'Enjoy' }).body).toContain('\n\nComment: Enjoy');
+    });
+
+    it('tells the requester where it was declined, with the reason', () => {
+      const email = leaveDecided(leave(), { approved: false, stage: 'HR', comment: 'Not during shutdown' });
+
+      expect(email.subject).toBe('Your leave request was not approved');
+      expect(email.body).toBe(
+        'Hello Eve Worker,\n\nYour request for 3 working days of annual leave from 2026-12-01 to 2026-12-03, back on 2026-12-04 was declined at the HR step.\n\nReason: Not during shutdown',
+      );
+      expect(leaveDecided(leave(), { approved: false, stage: 'supervisor', comment: null }).body).not.toContain('Reason');
     });
   });
 

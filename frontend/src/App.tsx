@@ -38,6 +38,7 @@ import { HRDashboardPage } from './modules/hr/HRDashboardPage';
 import { ShiftAttendancePage } from './modules/hr/ShiftAttendancePage';
 import { DocumentDetailPage } from './modules/document-control/DocumentDetailPage';
 import { DocumentsListPage } from './modules/document-control/DocumentsListPage';
+import { LeavePage } from './modules/leave/LeavePage';
 import { UsersListPage } from './modules/users/UsersListPage';
 
 export default function App() {
@@ -77,6 +78,7 @@ export default function App() {
         <Route path="/hr/employees" element={<EmployeesListPage />} />
         <Route path="/hr/employees/:id" element={<EmployeeDetailPage />} />
         <Route path="/hr/shift-attendance" element={<ShiftAttendancePage />} />
+        <Route path="/hr/leaves" element={<LeavePage />} />
         <Route path="/hr/expense-requests" element={<ExpenseRequestsPage />} />
         <Route path="/hr/appraisal-cycles" element={<AppraisalCyclesListPage />} />
         <Route path="/hr/appraisal-cycles/:id" element={<AppraisalCycleDetailPage />} />

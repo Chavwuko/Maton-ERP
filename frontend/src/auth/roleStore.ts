@@ -7,6 +7,7 @@ export const ROLES = [
   'admin',
   'finance',
   'hr',
+  'executive_director',
   'maintenance',
   'hse',
   'project_control',

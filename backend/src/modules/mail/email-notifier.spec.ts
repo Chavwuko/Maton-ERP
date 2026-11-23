@@ -98,6 +98,40 @@ describe('EmailNotifier', () => {
     expect(mail.send).toHaveBeenNthCalledWith(2, ['boss@acme.com', 'kay@acme.com'], expect.any(String), expect.any(String));
   });
 
+  describe('leave', () => {
+    const leave = {
+      employeeName: 'Eve Worker',
+      employeeEmail: 'eve@acme.com',
+      leaveType: 'Annual leave',
+      startDate: new Date('2026-12-01'),
+      endDate: new Date('2026-12-03'),
+      returnDate: new Date('2026-12-04'),
+      days: 3,
+    };
+
+    it('asks the supervisor and head for the first step, HR for the second, the director for the last', async () => {
+      await notifier.leaveAwaiting(leave, 'SUPERVISOR', ['mgr@acme.com', 'head@acme.com']);
+      await notifier.leaveAwaiting(leave, 'HR', []);
+      await notifier.leaveAwaiting(leave, 'DIRECTOR', []);
+
+      expect(mail.send).toHaveBeenNthCalledWith(
+        1,
+        ['mgr@acme.com', 'head@acme.com'],
+        'Leave request awaiting your decision — Eve Worker',
+        expect.stringContaining('Open leave requests: /hr/leaves?tab=approvals'),
+      );
+      expect(prisma.user.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({ where: { status: 'ACTIVE', role: { name: { in: ['hr'] } } } }));
+      expect(prisma.user.findMany).toHaveBeenNthCalledWith(2, expect.objectContaining({ where: { status: 'ACTIVE', role: { name: { in: ['executive_director'] } } } }));
+      expect(mail.send).toHaveBeenNthCalledWith(2, ['boss@acme.com', 'kay@acme.com'], expect.any(String), expect.any(String));
+    });
+
+    it('tells the requester how it ended', async () => {
+      await notifier.leaveDecided(leave, { approved: true, stage: 'executive director', comment: null });
+
+      expect(mail.send).toHaveBeenCalledWith(['eve@acme.com'], 'Your leave has been approved', expect.stringContaining('Open your leave: /hr/leaves'));
+    });
+  });
+
   it('never throws: a failed lookup or send is logged and swallowed', async () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     prisma.user.findMany.mockRejectedValue(new Error('db down'));

@@ -12,6 +12,7 @@ import { DocumentControlModule } from './modules/document-control/document-contr
 import { HseModule } from './modules/hse/hse.module';
 import { HrModule } from './modules/hr/hr.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
+import { LeaveModule } from './modules/leave/leave.module';
 import { MailModule } from './modules/mail/mail.module';
 import { MaintenanceModule } from './modules/maintenance/maintenance.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -39,6 +40,7 @@ import { StorageModule } from './storage/storage.module';
     AccountingModule,
     HseModule,
     HrModule,
+    LeaveModule,
     UsersModule,
     SettingsModule,
     ReportsModule,
